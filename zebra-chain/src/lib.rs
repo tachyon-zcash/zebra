@@ -36,6 +36,7 @@ pub mod sapling;
 pub mod serialization;
 pub mod shutdown;
 pub mod sprout;
+pub mod tachyon;
 pub mod subtree;
 pub mod transaction;
 pub mod transparent;

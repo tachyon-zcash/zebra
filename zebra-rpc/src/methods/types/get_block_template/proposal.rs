@@ -231,6 +231,7 @@ pub fn proposal_block_from_template(
             difficulty_threshold,
             nonce: [0; 32].into(),
             solution: Solution::for_proposal(),
+            shielded_transaction_aggregate: None,
         }),
         transactions,
     })

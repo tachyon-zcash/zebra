@@ -3,18 +3,9 @@
 use proptest::prelude::*;
 
 use crate::{
-    amount::NonNegative,
-    block,
-    fmt::{HexDebug, SummaryDebug},
-    history_tree::HistoryTree,
-    parameters::{NetworkUpgrade::*, GENESIS_PREVIOUS_BLOCK_HASH},
-    serialization::{self, BytesInDisplayOrder},
-    transaction::arbitrary::MAX_ARBITRARY_ITEMS,
-    transparent::{
-        new_transaction_ordered_outputs, CoinbaseSpendRestriction,
-        MIN_TRANSPARENT_COINBASE_MATURITY,
-    },
-    work::{difficulty::CompactDifficulty, equihash},
+    amount::NonNegative, block, fmt::{HexDebug, SummaryDebug}, history_tree::HistoryTree, parameters::{GENESIS_PREVIOUS_BLOCK_HASH, NetworkUpgrade::*}, serialization::{self, BytesInDisplayOrder}, tachyon::ShieldedTransactionAggregate, transaction::arbitrary::MAX_ARBITRARY_ITEMS, transparent::{
+        CoinbaseSpendRestriction, MIN_TRANSPARENT_COINBASE_MATURITY, new_transaction_ordered_outputs
+    }, work::{difficulty::CompactDifficulty, equihash}
 };
 
 use super::*;
@@ -728,6 +719,7 @@ impl Arbitrary for Header {
             any::<CompactDifficulty>(),
             any::<HexDebug<[u8; 32]>>(),
             any::<equihash::Solution>(),
+            any::<Option<ShieldedTransactionAggregate>>(),
         )
             .prop_map(
                 move |(
@@ -739,6 +731,7 @@ impl Arbitrary for Header {
                     difficulty_threshold,
                     nonce,
                     solution,
+                    shielded_transaction_aggregate,
                 )| {
                     if let Some(previous_block_hash_override) =
                         ledger_state.previous_block_hash_override
@@ -757,6 +750,7 @@ impl Arbitrary for Header {
                         difficulty_threshold,
                         nonce,
                         solution,
+                        shielded_transaction_aggregate,
                     }
                 },
             )

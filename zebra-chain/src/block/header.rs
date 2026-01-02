@@ -10,6 +10,7 @@ use crate::{
     parameters::Network,
     serialization::{TrustedPreallocate, MAX_PROTOCOL_MESSAGE_LEN},
     work::{difficulty::CompactDifficulty, equihash::Solution},
+    tachyon::ShieldedTransactionAggregate,
 };
 
 use super::{merkle, Commitment, CommitmentError, Hash, Height};
@@ -83,6 +84,8 @@ pub struct Header {
 
     /// The Equihash solution.
     pub solution: Solution,
+
+    pub shielded_transaction_aggregate: Option<ShieldedTransactionAggregate>,
 }
 
 /// TODO: Use this error as the source for zebra_consensus::error::BlockError::Time,
