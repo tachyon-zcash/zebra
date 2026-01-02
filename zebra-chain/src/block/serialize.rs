@@ -160,6 +160,7 @@ impl ZcashDeserialize for Block {
         Ok(Block {
             header: limited_reader.zcash_deserialize_into()?,
             transactions: limited_reader.zcash_deserialize_into()?,
+            tachygrams: None,
         })
     }
 }

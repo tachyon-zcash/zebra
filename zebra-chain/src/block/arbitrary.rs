@@ -361,6 +361,7 @@ impl Arbitrary for Block {
             .prop_map(move |(header, transactions)| Self {
                 header: header.into(),
                 transactions,
+                tachygrams: None,
             })
             .boxed()
     }

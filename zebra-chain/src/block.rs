@@ -13,6 +13,7 @@ use crate::{
     sapling,
     serialization::{TrustedPreallocate, MAX_PROTOCOL_MESSAGE_LEN},
     sprout,
+    tachyon,
     transaction::Transaction,
     transparent,
     value_balance::{ValueBalance, ValueBalanceError},
@@ -56,6 +57,8 @@ pub struct Block {
     pub header: Arc<Header>,
     /// The block transactions.
     pub transactions: Vec<Arc<Transaction>>,
+    /// The block tachygrams
+    pub tachygrams: Option<Vec<tachyon::Tachygram>>,
 }
 
 impl fmt::Display for Block {

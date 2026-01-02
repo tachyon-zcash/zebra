@@ -234,5 +234,6 @@ pub fn proposal_block_from_template(
             shielded_transaction_aggregate: None,
         }),
         transactions,
+        tachygrams: None,
     })
 }
