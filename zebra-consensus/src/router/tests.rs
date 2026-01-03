@@ -39,6 +39,7 @@ pub fn block_no_transactions() -> Block {
             .zcash_deserialize_into()
             .unwrap(),
         transactions: Vec::new(),
+        tachygrams: None,
     }
 }
 
