@@ -7,6 +7,7 @@ use thiserror::Error;
 
 use crate::{
     fmt::HexDebug,
+    orchard,
     parameters::Network,
     serialization::{TrustedPreallocate, MAX_PROTOCOL_MESSAGE_LEN},
     work::{difficulty::CompactDifficulty, equihash::Solution},
@@ -86,6 +87,14 @@ pub struct Header {
     pub solution: Solution,
 
     pub shielded_transaction_aggregate: Option<ShieldedTransactionAggregate>,
+
+    /// The root of the block tachygram Merkle tree.
+    ///
+    /// This tree commits to the tachygrams in this block and chains to the
+    /// previous block's tachygram root. The first leaf is the previous block's
+    /// block_tachygram_root, and the remaining leaves are the tachygrams from
+    /// this block's tachygrams field.
+    pub block_tachygram_root: orchard::tree::Root,
 }
 
 /// TODO: Use this error as the source for zebra_consensus::error::BlockError::Time,
@@ -157,9 +166,10 @@ pub struct CountedHeader {
 
 /// The serialized size of a Zcash block header.
 ///
-/// Includes the equihash input, 32-byte nonce, 3-byte equihash length field, and equihash solution.
+/// Includes the equihash input, 32-byte nonce, 3-byte equihash length field, equihash solution,
+/// and 32-byte block_tachygram_root.
 const BLOCK_HEADER_LENGTH: usize =
-    crate::work::equihash::Solution::INPUT_LENGTH + 32 + 3 + crate::work::equihash::SOLUTION_SIZE;
+    crate::work::equihash::Solution::INPUT_LENGTH + 32 + 3 + crate::work::equihash::SOLUTION_SIZE + 32;
 
 /// The minimum size for a serialized CountedHeader.
 ///

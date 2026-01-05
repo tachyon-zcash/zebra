@@ -79,6 +79,7 @@ impl ZcashSerialize for Header {
         writer.write_u32::<LittleEndian>(self.difficulty_threshold.0)?;
         writer.write_all(&self.nonce[..])?;
         self.solution.zcash_serialize(&mut writer)?;
+        self.block_tachygram_root.zcash_serialize(&mut writer)?;
         Ok(())
     }
 }
@@ -102,8 +103,9 @@ impl ZcashDeserialize for Header {
                 ))?,
             difficulty_threshold: CompactDifficulty(reader.read_u32::<LittleEndian>()?),
             nonce: reader.read_32_bytes()?.into(),
-            solution: equihash::Solution::zcash_deserialize(reader)?,
+            solution: equihash::Solution::zcash_deserialize(&mut reader)?,
             shielded_transaction_aggregate: None,
+            block_tachygram_root: crate::orchard::tree::Root::zcash_deserialize(&mut reader)?,
         })
     }
 }

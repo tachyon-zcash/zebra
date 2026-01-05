@@ -253,6 +253,137 @@ impl Block {
     pub fn auth_data_root(&self) -> AuthDataRoot {
         self.transactions.iter().collect::<AuthDataRoot>()
     }
+
+    /// Compute the root of the block tachygram Merkle tree.
+    ///
+    /// The tree structure is:
+    /// - First leaf: `previous_block_tachygram_root` (from the previous block's header)
+    /// - Remaining leaves: tachygrams from this block's `tachygrams` field
+    ///
+    /// Returns the computed root that should match the `block_tachygram_root` field
+    /// in this block's header.
+    pub fn compute_block_tachygram_root(
+        &self,
+        previous_block_tachygram_root: orchard::tree::Root,
+    ) -> orchard::tree::Root {
+        // Collect all leaves: previous root + tachygrams
+        let mut leaves: Vec<pallas::Base> = Vec::new();
+
+        // First leaf is the previous block's tachygram root
+        leaves.push(previous_block_tachygram_root.into());
+
+        // Add leaves for each tachygram in this block
+        if let Some(ref tachygrams) = self.tachygrams {
+            for tachygram in tachygrams {
+                leaves.push(Self::hash_tachygram_to_base(tachygram));
+            }
+        }
+
+        // Build the merkle tree from the leaves
+        Self::compute_merkle_root(&leaves)
+    }
+
+    /// Hash a tachygram to a pallas::Base field element.
+    ///
+    /// Uses BLAKE2b-256 personalized with "ZcashTachygramH" to hash the
+    /// serialized tachygram, then interprets the result as a field element.
+    fn hash_tachygram_to_base(_tachygram: &tachyon::Tachygram) -> pallas::Base {
+        use halo2::pasta::group::ff::PrimeField;
+
+        // Serialize the tachygram
+        // For now, since Tachygram is empty, this will be empty bytes
+        // TODO: Update this when Tachygram has fields
+        let serialized = Vec::new(); // tachygram serialization would go here
+
+        // Hash the serialized tachygram
+        let hash = blake2b_simd::Params::new()
+            .hash_length(32)
+            .personal(b"ZcashTachygramH")
+            .to_state()
+            .update(&serialized)
+            .finalize();
+
+        // Convert the hash to a field element
+        // We use from_repr which may fail if the value is not in the field,
+        // but BLAKE2b output should be uniformly distributed
+        let bytes: [u8; 32] = hash.as_bytes().try_into().expect("blake2b outputs 32 bytes");
+        pallas::Base::from_repr(bytes).unwrap_or(pallas::Base::zero())
+    }
+
+    /// Compute the merkle root from a list of leaf nodes using the Orchard
+    /// merkle hash function.
+    ///
+    /// Uses the same hash function as the Orchard note commitment tree
+    /// (MerkleCRH^Orchard with Sinsemilla hash).
+    fn compute_merkle_root(leaves: &[pallas::Base]) -> orchard::tree::Root {
+        if leaves.is_empty() {
+            return orchard::tree::Root::default();
+        }
+
+        if leaves.len() == 1 {
+            return orchard::tree::Root::from(leaves[0]);
+        }
+
+        // Build the tree bottom-up
+        let mut current_level = leaves.to_vec();
+        let mut layer: u8 = Self::compute_tree_depth(leaves.len()) - 1;
+
+        while current_level.len() > 1 {
+            let mut next_level = Vec::new();
+
+            for chunk in current_level.chunks(2) {
+                let left = chunk[0];
+                let right = if chunk.len() == 2 {
+                    chunk[1]
+                } else {
+                    // If odd number of nodes, duplicate the last one
+                    chunk[0]
+                };
+
+                // Use the Orchard merkle hash function
+                next_level.push(Self::merkle_hash_orchard(layer, left, right));
+            }
+
+            current_level = next_level;
+            layer = layer.saturating_sub(1);
+        }
+
+        orchard::tree::Root::from(current_level[0])
+    }
+
+    /// Compute the depth of a merkle tree needed to hold `leaf_count` leaves.
+    fn compute_tree_depth(leaf_count: usize) -> u8 {
+        if leaf_count <= 1 {
+            return 0;
+        }
+        // Depth is ceil(log2(leaf_count))
+        (leaf_count.next_power_of_two().trailing_zeros() as u8)
+            .max(1)
+    }
+
+    /// MerkleCRH^Orchard Hash Function
+    ///
+    /// This is the same hash function used in the Orchard note commitment tree.
+    /// Uses SinsemillaHash to combine two pallas::Base values at a given layer.
+    fn merkle_hash_orchard(layer: u8, left: pallas::Base, right: pallas::Base) -> pallas::Base {
+        use bitvec::prelude::*;
+        use halo2::pasta::group::ff::PrimeField;
+
+        const MERKLE_DEPTH: u8 = 32;
+
+        let mut s = bitvec![u8, Lsb0;];
+
+        // Prefix: l = I2LEBSP_10(MerkleDepth - 1 - layer)
+        let l = MERKLE_DEPTH - 1 - layer;
+        s.extend_from_bitslice(&BitArray::<_, Lsb0>::from([l, 0])[0..10]);
+        s.extend_from_bitslice(&BitArray::<_, Lsb0>::from(left.to_repr())[0..255]);
+        s.extend_from_bitslice(&BitArray::<_, Lsb0>::from(right.to_repr())[0..255]);
+
+        match orchard::sinsemilla::sinsemilla_hash(b"z.cash:Orchard-MerkleCRH", &s) {
+            Some(h) => h,
+            None => pallas::Base::zero(),
+        }
+    }
 }
 
 impl<'a> From<&'a Block> for Hash {

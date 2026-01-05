@@ -135,6 +135,18 @@ impl From<&Root> for [u8; 32] {
     }
 }
 
+impl From<pallas::Base> for Root {
+    fn from(base: pallas::Base) -> Self {
+        Root(base)
+    }
+}
+
+impl From<Root> for pallas::Base {
+    fn from(root: Root) -> Self {
+        root.0
+    }
+}
+
 impl Hash for Root {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_repr().hash(state)

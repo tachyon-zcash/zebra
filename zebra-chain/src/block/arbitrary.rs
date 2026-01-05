@@ -721,6 +721,7 @@ impl Arbitrary for Header {
             any::<HexDebug<[u8; 32]>>(),
             any::<equihash::Solution>(),
             any::<Option<ShieldedTransactionAggregate>>(),
+            any::<orchard::tree::Root>(),
         )
             .prop_map(
                 move |(
@@ -733,6 +734,7 @@ impl Arbitrary for Header {
                     nonce,
                     solution,
                     shielded_transaction_aggregate,
+                    block_tachygram_root,
                 )| {
                     if let Some(previous_block_hash_override) =
                         ledger_state.previous_block_hash_override
@@ -752,6 +754,7 @@ impl Arbitrary for Header {
                         nonce,
                         solution,
                         shielded_transaction_aggregate,
+                        block_tachygram_root,
                     }
                 },
             )
