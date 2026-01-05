@@ -173,6 +173,7 @@ impl ZebraDb {
         Some(Arc::new(Block {
             header,
             transactions,
+            tachygrams: None,
         }))
     }
 
@@ -207,6 +208,7 @@ impl ZebraDb {
         let block = Block {
             header,
             transactions: txs,
+            tachygrams: None,
         };
         Some((Arc::new(block), size))
     }

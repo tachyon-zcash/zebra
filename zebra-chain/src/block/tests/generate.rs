@@ -138,6 +138,7 @@ fn multi_transaction_block(oversized: bool) -> Block {
     let block = Block {
         header: block_header.into(),
         transactions,
+        tachygrams: None,
     };
 
     let serialized_len = block.zcash_serialize_to_vec().unwrap().len();
@@ -210,6 +211,7 @@ fn single_transaction_block_many_inputs(oversized: bool) -> Block {
     let block = Block {
         header: block_header.into(),
         transactions,
+        tachygrams: None,
     };
 
     let serialized_len = block.zcash_serialize_to_vec().unwrap().len();
@@ -280,6 +282,7 @@ fn single_transaction_block_many_outputs(oversized: bool) -> Block {
     let block = Block {
         header: block_header.into(),
         transactions,
+        tachygrams: None,
     };
 
     let serialized_len = block.zcash_serialize_to_vec().unwrap().len();

@@ -1,0 +1,23 @@
+[mining]
+#miner_address = 'tmLGFBCdqr4haWnJG3P8Mpy4GntGKfq92iW'
+miner_address = 'tmVrxY32BP8ApQwhdsgsdd2qgi4Rm4Y6T6J'
+internal_miner = true
+
+[network]
+network = "Regtest"
+
+# This section may be omitted when testing only Canopy
+[network.testnet_parameters.activation_heights]
+# Configured activation heights must be greater than or equal to 1,
+# block height 0 is reserved for the Genesis network upgrade in Zebra
+"NU6.1" = 1
+
+# This section may be omitted if a persistent Regtest chain state is desired
+[state]
+ephemeral = false
+
+# This section may be omitted if it's not necessary to send transactions to Zebra's mempool
+[rpc]
+listen_addr = "0.0.0.0:18232"
+enable_cookie_auth = false
+parallel_cpu_threads = 0

@@ -720,7 +720,6 @@ impl Arbitrary for Header {
             any::<CompactDifficulty>(),
             any::<HexDebug<[u8; 32]>>(),
             any::<equihash::Solution>(),
-            any::<Option<ShieldedTransactionAggregate>>(),
         )
             .prop_map(
                 move |(
@@ -732,7 +731,6 @@ impl Arbitrary for Header {
                     difficulty_threshold,
                     nonce,
                     solution,
-                    shielded_transaction_aggregate,
                 )| {
                     if let Some(previous_block_hash_override) =
                         ledger_state.previous_block_hash_override
@@ -751,7 +749,7 @@ impl Arbitrary for Header {
                         difficulty_threshold,
                         nonce,
                         solution,
-                        shielded_transaction_aggregate,
+                        shielded_transaction_aggregate: None,
                     }
                 },
             )
