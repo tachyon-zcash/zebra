@@ -232,6 +232,7 @@ pub fn proposal_block_from_template(
             nonce: [0; 32].into(),
             solution: Solution::for_proposal(),
             shielded_transaction_aggregate: None,
+            block_tachygram_root: zebra_chain::orchard::tree::Root::default(),
         }),
         transactions,
         tachygrams: None,
