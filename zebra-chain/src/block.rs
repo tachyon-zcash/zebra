@@ -273,41 +273,15 @@ impl Block {
         leaves.push(previous_block_tachygram_root.into());
 
         // Add leaves for each tachygram in this block
+        // Extract the x-coordinate from each tachygram (same as Orchard note commitments)
         if let Some(ref tachygrams) = self.tachygrams {
             for tachygram in tachygrams {
-                leaves.push(Self::hash_tachygram_to_base(tachygram));
+                leaves.push(tachygram.extract_x());
             }
         }
 
         // Build the merkle tree from the leaves
         Self::compute_merkle_root(&leaves)
-    }
-
-    /// Hash a tachygram to a pallas::Base field element.
-    ///
-    /// Uses BLAKE2b-256 personalized with "ZcashTachygramH" to hash the
-    /// serialized tachygram, then interprets the result as a field element.
-    fn hash_tachygram_to_base(_tachygram: &tachyon::Tachygram) -> pallas::Base {
-        use halo2::pasta::group::ff::PrimeField;
-
-        // Serialize the tachygram
-        // For now, since Tachygram is empty, this will be empty bytes
-        // TODO: Update this when Tachygram has fields
-        let serialized = Vec::new(); // tachygram serialization would go here
-
-        // Hash the serialized tachygram
-        let hash = blake2b_simd::Params::new()
-            .hash_length(32)
-            .personal(b"ZcashTachygramH")
-            .to_state()
-            .update(&serialized)
-            .finalize();
-
-        // Convert the hash to a field element
-        // We use from_repr which may fail if the value is not in the field,
-        // but BLAKE2b output should be uniformly distributed
-        let bytes: [u8; 32] = hash.as_bytes().try_into().expect("blake2b outputs 32 bytes");
-        pallas::Base::from_repr(bytes).unwrap_or(pallas::Base::zero())
     }
 
     /// Compute the merkle root from a list of leaf nodes using the Orchard
