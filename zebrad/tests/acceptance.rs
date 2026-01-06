@@ -3149,11 +3149,26 @@ async fn trusted_chain_sync_handles_forks_correctly() -> Result<()> {
         let header = Arc::make_mut(&mut block.header);
 
         header.commitment_bytes = match NetworkUpgrade::current(&net, height) {
+            NetworkUpgrade::Genesis
+            | NetworkUpgrade::BeforeOverwinter
+            | NetworkUpgrade::Overwinter
+            | NetworkUpgrade::Sapling
+            | NetworkUpgrade::Blossom
+            | NetworkUpgrade::Heartwood => Err(eyre!(
+                "Zebra does not support generating pre-Canopy block templates"
+            ))?,
             NetworkUpgrade::Canopy => hist_root.bytes_in_serialized_order(),
-            NetworkUpgrade::Nu5
-            | NetworkUpgrade::Nu6
-            | NetworkUpgrade::Nu6_1
-            | NetworkUpgrade::Nu7 => {
+            NetworkUpgrade::Nu5 | NetworkUpgrade::Nu6 | NetworkUpgrade::Nu6_1 => {
+                ChainHistoryBlockTxAuthCommitmentHash::from_commitments(&hist_root, &auth_root)
+                    .bytes_in_serialized_order()
+            }
+            #[cfg(not(zcash_unstable = "nu7"))]
+            NetworkUpgrade::Nu7 => {
+                ChainHistoryBlockTxAuthCommitmentHash::from_commitments(&hist_root, &auth_root)
+                    .bytes_in_serialized_order()
+            }
+            #[cfg(zcash_unstable = "zfuture")]
+            NetworkUpgrade::ZFuture => {
                 ChainHistoryBlockTxAuthCommitmentHash::from_commitments(&hist_root, &auth_root)
                     .bytes_in_serialized_order()
             }
