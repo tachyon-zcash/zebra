@@ -78,6 +78,11 @@ rustflags = [
 
     # fix hidden lifetime parameters
     #"-Wrust_2018_idioms",
+
+    # Enable zcash_unstable features
+    "--cfg", "zcash_unstable=\"zfuture\"",
+    "--cfg", "zcash_unstable=\"nu7\"",
+
 ]
 
 [build]
