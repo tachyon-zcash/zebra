@@ -974,7 +974,7 @@ fn binding_signatures() {
                             at_least_one_v5_checked = true;
                         }
                     }
-                    #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+                    #[cfg(zcash_unstable = "nu7")]
                     Transaction::V6 {
                         sapling_shielded_data,
                         ..

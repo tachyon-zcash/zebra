@@ -303,7 +303,7 @@ fn mock_transparent_transaction(
     // Create the mock transaction
     let expiry_height = block_height;
 
-    #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+    #[cfg(zcash_unstable = "nu7")]
     let zip233_amount = Amount::zero();
 
     let transaction = match transaction_version {
@@ -324,7 +324,7 @@ fn mock_transparent_transaction(
             orchard_shielded_data: None,
             network_upgrade,
         },
-        #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+        #[cfg(zcash_unstable = "nu7")]
         6 => Transaction::V6 {
             inputs,
             outputs,

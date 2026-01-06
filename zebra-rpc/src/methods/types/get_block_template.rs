@@ -280,9 +280,7 @@ impl BlockTemplateResponse {
         #[cfg(test)] mempool_txs: Vec<(InBlockTxDependenciesDepth, VerifiedUnminedTx)>,
         submit_old: Option<bool>,
         extra_coinbase_data: Vec<u8>,
-        #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))] zip233_amount: Option<
-            Amount<NonNegative>,
-        >,
+        #[cfg(zcash_unstable = "nu7")] zip233_amount: Option<Amount<NonNegative>>,
     ) -> Self {
         // Calculate the next block height.
         let next_block_height =
@@ -334,7 +332,7 @@ impl BlockTemplateResponse {
             &mempool_txs,
             chain_tip_and_local_time.chain_history_root,
             extra_coinbase_data,
-            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+            #[cfg(zcash_unstable = "nu7")]
             zip233_amount,
         )
         .expect("coinbase should be valid under the given parameters");
@@ -804,9 +802,7 @@ pub fn generate_coinbase_and_roots(
     mempool_txs: &[VerifiedUnminedTx],
     chain_history_root: Option<ChainHistoryMmrRootHash>,
     miner_data: Vec<u8>,
-    #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))] zip233_amount: Option<
-        Amount<NonNegative>,
-    >,
+    #[cfg(zcash_unstable = "nu7")] zip233_amount: Option<Amount<NonNegative>>,
 ) -> Result<(TransactionTemplate<NegativeOrZero>, DefaultRoots), &'static str> {
     let miner_fee = calculate_miner_fee(mempool_txs);
     let outputs = standard_coinbase_outputs(network, height, miner_address, miner_fee);
@@ -817,9 +813,9 @@ pub fn generate_coinbase_and_roots(
         NetworkUpgrade::Nu5 | NetworkUpgrade::Nu6 | NetworkUpgrade::Nu6_1 => {
             Transaction::new_v5_coinbase(network, height, outputs, miner_data)
         }
-        #[cfg(not(all(zcash_unstable = "nu7", feature = "tx_v6")))]
+        #[cfg(not(zcash_unstable = "nu7"))]
         NetworkUpgrade::Nu7 => Transaction::new_v5_coinbase(network, height, outputs, miner_data),
-        #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+        #[cfg(zcash_unstable = "nu7")]
         NetworkUpgrade::Nu7 => {
             Transaction::new_v6_coinbase(network, height, outputs, miner_data, zip233_amount)
         }
