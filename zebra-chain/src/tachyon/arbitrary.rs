@@ -1,3 +1,4 @@
+use group::prime::PrimeCurveAffine;
 use halo2::pasta::pallas;
 use proptest::prelude::*;
 
