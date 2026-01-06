@@ -277,8 +277,9 @@ impl Version for zcash_history::V1 {
             | NetworkUpgrade::Canopy
             | NetworkUpgrade::Nu5
             | NetworkUpgrade::Nu6
-            | NetworkUpgrade::Nu6_1
-            | NetworkUpgrade::Nu7 => {}
+            | NetworkUpgrade::Nu6_1 => {}
+            #[cfg(zcash_unstable = "nu7")]
+            NetworkUpgrade::Nu7 => {}
             #[cfg(zcash_unstable = "zfuture")]
             NetworkUpgrade::ZFuture => {}
         };

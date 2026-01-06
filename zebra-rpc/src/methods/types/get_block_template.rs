@@ -809,14 +809,27 @@ pub fn generate_coinbase_and_roots(
     let current_nu = NetworkUpgrade::current(network, height);
 
     let tx = match current_nu {
+        NetworkUpgrade::Genesis
+        | NetworkUpgrade::BeforeOverwinter
+        | NetworkUpgrade::Overwinter
+        | NetworkUpgrade::Sapling
+        | NetworkUpgrade::Blossom
+        | NetworkUpgrade::Heartwood => {
+            Err("Zebra does not support generating pre-Canopy coinbase transactions")?
+        }
+
         NetworkUpgrade::Canopy => Transaction::new_v4_coinbase(height, outputs, miner_data),
         NetworkUpgrade::Nu5 | NetworkUpgrade::Nu6 | NetworkUpgrade::Nu6_1 => {
             Transaction::new_v5_coinbase(network, height, outputs, miner_data)
         }
-        #[cfg(not(zcash_unstable = "nu7"))]
-        NetworkUpgrade::Nu7 => Transaction::new_v5_coinbase(network, height, outputs, miner_data),
+
         #[cfg(zcash_unstable = "nu7")]
         NetworkUpgrade::Nu7 => {
+            Transaction::new_v6_coinbase(network, height, outputs, miner_data, zip233_amount)
+        }
+
+        #[cfg(zcash_unstable = "zfuture")]
+        NetworkUpgrade::ZFuture => {
             Transaction::new_v6_coinbase(network, height, outputs, miner_data, zip233_amount)
         }
     }

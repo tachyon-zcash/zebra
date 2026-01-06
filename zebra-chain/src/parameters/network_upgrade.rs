@@ -68,11 +68,14 @@ pub enum NetworkUpgrade {
     /// The Zcash protocol after the NU6.1 upgrade.
     #[serde(rename = "NU6.1")]
     Nu6_1,
+
     /// The Zcash protocol after the NU7 upgrade.
+    #[cfg(zcash_unstable = "nu7")]
     #[serde(rename = "NU7")]
     Nu7,
 
     #[cfg(zcash_unstable = "zfuture")]
+    #[serde(rename = "ZFuture")]
     ZFuture,
 }
 
@@ -406,9 +409,12 @@ impl NetworkUpgrade {
     pub fn target_spacing(&self) -> Duration {
         let spacing_seconds = match self {
             Genesis | BeforeOverwinter | Overwinter | Sapling => PRE_BLOSSOM_POW_TARGET_SPACING,
-            Blossom | Heartwood | Canopy | Nu5 | Nu6 | Nu6_1 | Nu7 => {
+            Blossom | Heartwood | Canopy | Nu5 | Nu6 | Nu6_1 => {
                 POST_BLOSSOM_POW_TARGET_SPACING.into()
             }
+
+            #[cfg(zcash_unstable = "nu7")]
+            Nu7 => POST_BLOSSOM_POW_TARGET_SPACING.into(),
 
             #[cfg(zcash_unstable = "zfuture")]
             ZFuture => POST_BLOSSOM_POW_TARGET_SPACING.into(),

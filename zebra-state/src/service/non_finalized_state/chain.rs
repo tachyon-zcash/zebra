@@ -1584,6 +1584,7 @@ impl Chain {
                     sapling_shielded_data,
                     orchard_shielded_data,
                 ),
+
                 #[cfg(zcash_unstable = "nu7")]
                 V6 {
                     inputs,
@@ -1769,6 +1770,7 @@ impl UpdateWith<ContextuallyVerifiedBlock> for Chain {
                     sapling_shielded_data,
                     orchard_shielded_data,
                 ),
+
                 #[cfg(zcash_unstable = "nu7")]
                 V6 {
                     inputs,
