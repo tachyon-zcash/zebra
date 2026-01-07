@@ -3162,7 +3162,7 @@ async fn trusted_chain_sync_handles_forks_correctly() -> Result<()> {
                 ChainHistoryBlockTxAuthCommitmentHash::from_commitments(&hist_root, &auth_root)
                     .bytes_in_serialized_order()
             }
-            #[cfg(not(zcash_unstable = "nu7"))]
+            #[cfg(zcash_unstable = "nu7")]
             NetworkUpgrade::Nu7 => {
                 ChainHistoryBlockTxAuthCommitmentHash::from_commitments(&hist_root, &auth_root)
                     .bytes_in_serialized_order()
