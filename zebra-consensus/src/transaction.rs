@@ -935,8 +935,19 @@ where
             // Does not support V4 transactions
             NetworkUpgrade::Genesis
             | NetworkUpgrade::BeforeOverwinter
-            | NetworkUpgrade::Overwinter
-            | NetworkUpgrade::Nu7 => Err(TransactionError::UnsupportedByNetworkUpgrade(
+            | NetworkUpgrade::Overwinter => Err(TransactionError::UnsupportedByNetworkUpgrade(
+                transaction.version(),
+                network_upgrade,
+            )),
+
+            #[cfg(zcash_unstable = "nu7")]
+            NetworkUpgrade::Nu7 => Err(TransactionError::UnsupportedByNetworkUpgrade(
+                transaction.version(),
+                network_upgrade,
+            )),
+
+            #[cfg(zcash_unstable = "zfuture")]
+            NetworkUpgrade::ZFuture => Err(TransactionError::UnsupportedByNetworkUpgrade(
                 transaction.version(),
                 network_upgrade,
             )),
@@ -1008,10 +1019,10 @@ where
             //
             // Note: Here we verify the transaction version number of the above rule, the group
             // id is checked in zebra-chain crate, in the transaction serialize.
-            NetworkUpgrade::Nu5
-            | NetworkUpgrade::Nu6
-            | NetworkUpgrade::Nu6_1
-            | NetworkUpgrade::Nu7 => Ok(()),
+            NetworkUpgrade::Nu5 | NetworkUpgrade::Nu6 | NetworkUpgrade::Nu6_1 => Ok(()),
+
+            #[cfg(zcash_unstable = "nu7")]
+            NetworkUpgrade::Nu7 => Ok(()),
 
             #[cfg(zcash_unstable = "zfuture")]
             NetworkUpgrade::ZFuture => Ok(()),

@@ -323,9 +323,12 @@ pub struct ConfiguredActivationHeights {
     /// Activation height for `NU6.1` network upgrade.
     #[serde(rename = "NU6.1")]
     pub nu6_1: Option<u32>,
+
     /// Activation height for `NU7` network upgrade.
     #[serde(rename = "NU7")]
+    #[cfg(zcash_unstable = "nu7")]
     pub nu7: Option<u32>,
+
     /// Activation height for `ZFuture` network upgrade.
     #[serde(rename = "ZFuture")]
     #[cfg(zcash_unstable = "zfuture")]
@@ -346,7 +349,10 @@ impl ConfiguredActivationHeights {
             nu5,
             nu6,
             nu6_1,
+
+            #[cfg(zcash_unstable = "nu7")]
             nu7,
+
             #[cfg(zcash_unstable = "zfuture")]
             zfuture,
         } = self;
@@ -367,7 +373,10 @@ impl ConfiguredActivationHeights {
             nu5,
             nu6,
             nu6_1,
+
+            #[cfg(zcash_unstable = "nu7")]
             nu7,
+
             #[cfg(zcash_unstable = "zfuture")]
             zfuture,
         }
@@ -557,6 +566,7 @@ impl ParametersBuilder {
             nu5,
             nu6,
             nu6_1,
+            #[cfg(zcash_unstable = "nu7")]
             nu7,
             #[cfg(zcash_unstable = "zfuture")]
             zfuture,
@@ -583,8 +593,10 @@ impl ParametersBuilder {
                 .chain(canopy.into_iter().map(|h| (h, Canopy)))
                 .chain(nu5.into_iter().map(|h| (h, Nu5)))
                 .chain(nu6.into_iter().map(|h| (h, Nu6)))
-                .chain(nu6_1.into_iter().map(|h| (h, Nu6_1)))
-                .chain(nu7.into_iter().map(|h| (h, Nu7)));
+                .chain(nu6_1.into_iter().map(|h| (h, Nu6_1)));
+
+            #[cfg(zcash_unstable = "nu7")]
+            let activation_heights = activation_heights.chain(nu7.into_iter().map(|h| (h, Nu7)));
 
             #[cfg(zcash_unstable = "zfuture")]
             let activation_heights =

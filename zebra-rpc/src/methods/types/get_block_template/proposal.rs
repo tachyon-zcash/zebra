@@ -223,8 +223,10 @@ pub fn proposal_block_from_template(
         NetworkUpgrade::Nu5 | NetworkUpgrade::Nu6 | NetworkUpgrade::Nu6_1 => {
             block_commitments_hash.bytes_in_serialized_order()
         }
-        #[cfg(not(zcash_unstable = "nu7"))]
+
+        #[cfg(zcash_unstable = "nu7")]
         NetworkUpgrade::Nu7 => block_commitments_hash.bytes_in_serialized_order(),
+
         #[cfg(zcash_unstable = "zfuture")]
         NetworkUpgrade::ZFuture => block_commitments_hash.bytes_in_serialized_order(),
     }

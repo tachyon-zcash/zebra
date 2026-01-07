@@ -116,7 +116,11 @@ impl Version {
                 170_130
             }
             (Mainnet, Nu6_1) => 170_140,
+
+            #[cfg(zcash_unstable = "nu7")]
             (Testnet(params), Nu7) if params.is_default_testnet() || params.is_regtest() => 170_150,
+
+            #[cfg(zcash_unstable = "nu7")]
             (Mainnet, Nu7) => 170_160,
 
             // It should be fine to reject peers with earlier network protocol versions on custom testnets for now.
