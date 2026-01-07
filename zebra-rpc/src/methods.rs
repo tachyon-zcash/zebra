@@ -1480,6 +1480,10 @@ where
                 Commitment::ChainHistoryBlockTxAuthCommitment(hash) => {
                     hash.bytes_in_display_order()
                 }
+                #[cfg(zcash_unstable = "zfuture")]
+                Commitment::ChainHistoryBlockTxAuthCommitmentTachygram(hash) => {
+                    hash.bytes_in_display_order()
+                }
             };
 
             let block_header = BlockHeaderObject {

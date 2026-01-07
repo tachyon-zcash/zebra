@@ -749,7 +749,6 @@ impl Arbitrary for Header {
                         difficulty_threshold,
                         nonce,
                         solution,
-                        shielded_transaction_aggregate: None,
                     }
                 },
             )

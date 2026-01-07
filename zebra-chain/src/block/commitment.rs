@@ -96,6 +96,19 @@ pub enum Commitment {
     ///
     /// TODO: this field is verified during contextual verification
     ChainHistoryBlockTxAuthCommitment(ChainHistoryBlockTxAuthCommitmentHash),
+
+    /// [ZFuture activation onwards] A commitment to:
+    /// - the chain history Merkle Mountain Range tree,
+    /// - the auth data merkle tree covering this block,
+    /// - the block tachygram root, and
+    /// - the shielded transaction aggregate.
+    ///
+    /// This extends the NU5+ commitment with additional fields for tachygrams
+    /// and shielded transaction aggregates.
+    ///
+    /// TODO: this field is verified during contextual verification
+    #[cfg(zcash_unstable = "zfuture")]
+    ChainHistoryBlockTxAuthCommitmentTachygram(ChainHistoryBlockTxAuthCommitmentTachygramHash),
 }
 
 /// The required value of reserved `Commitment`s.
@@ -144,8 +157,8 @@ impl Commitment {
             )),
 
             #[cfg(zcash_unstable = "zfuture")]
-            (ZFuture, _) => Ok(ChainHistoryBlockTxAuthCommitment(
-                ChainHistoryBlockTxAuthCommitmentHash(bytes),
+            (ZFuture, _) => Ok(ChainHistoryBlockTxAuthCommitmentTachygram(
+                ChainHistoryBlockTxAuthCommitmentTachygramHash(bytes),
             )),
         }
     }
@@ -163,6 +176,8 @@ impl Commitment {
             ChainHistoryActivationReserved => CHAIN_HISTORY_ACTIVATION_RESERVED,
             ChainHistoryRoot(hash) => hash.0,
             ChainHistoryBlockTxAuthCommitment(hash) => hash.0,
+            #[cfg(zcash_unstable = "zfuture")]
+            ChainHistoryBlockTxAuthCommitmentTachygram(hash) => hash.0,
         }
     }
 }
@@ -352,6 +367,155 @@ impl FromHex for ChainHistoryBlockTxAuthCommitmentHash {
     }
 }
 
+/// A block commitment to chain history, transaction auth, tachygrams, and shielded transaction aggregate.
+/// - the chain history tree for all ancestors in the current network upgrade,
+/// - the transaction authorising data in this block,
+/// - the block tachygram root, and
+/// - the shielded transaction aggregate.
+///
+/// Introduced in ZFuture.
+#[cfg(zcash_unstable = "zfuture")]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ChainHistoryBlockTxAuthCommitmentTachygramHash([u8; 32]);
+
+#[cfg(zcash_unstable = "zfuture")]
+impl fmt::Display for ChainHistoryBlockTxAuthCommitmentTachygramHash {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.encode_hex::<String>())
+    }
+}
+
+#[cfg(zcash_unstable = "zfuture")]
+impl fmt::Debug for ChainHistoryBlockTxAuthCommitmentTachygramHash {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("ChainHistoryBlockTxAuthCommitmentTachygramHash")
+            .field(&self.encode_hex::<String>())
+            .finish()
+    }
+}
+
+#[cfg(zcash_unstable = "zfuture")]
+impl From<[u8; 32]> for ChainHistoryBlockTxAuthCommitmentTachygramHash {
+    fn from(hash: [u8; 32]) -> Self {
+        ChainHistoryBlockTxAuthCommitmentTachygramHash(hash)
+    }
+}
+
+#[cfg(zcash_unstable = "zfuture")]
+impl From<ChainHistoryBlockTxAuthCommitmentTachygramHash> for [u8; 32] {
+    fn from(hash: ChainHistoryBlockTxAuthCommitmentTachygramHash) -> Self {
+        hash.0
+    }
+}
+
+#[cfg(zcash_unstable = "zfuture")]
+impl BytesInDisplayOrder<true> for ChainHistoryBlockTxAuthCommitmentTachygramHash {
+    fn bytes_in_serialized_order(&self) -> [u8; 32] {
+        self.0
+    }
+
+    fn from_bytes_in_serialized_order(bytes: [u8; 32]) -> Self {
+        ChainHistoryBlockTxAuthCommitmentTachygramHash(bytes)
+    }
+}
+
+#[cfg(zcash_unstable = "zfuture")]
+impl ChainHistoryBlockTxAuthCommitmentTachygramHash {
+    /// Compute the block commitment from the history tree root, the
+    /// authorization data root, the block tachygram root, and the
+    /// shielded transaction aggregate.
+    ///
+    /// `history_tree_root` is the root of the history tree up to and including
+    /// the *previous* block.
+    /// `auth_data_root` is the root of the Merkle tree of authorizing data
+    /// commmitments of each transaction in the *current* block.
+    /// `block_tachygram_root` is the root of the block tachygram tree in the
+    /// *current* block.
+    /// `shielded_transaction_aggregate` is the aggregate of shielded transactions
+    /// in the *current* block.
+    pub fn from_commitments(
+        history_tree_root: &ChainHistoryMmrRootHash,
+        auth_data_root: &AuthDataRoot,
+        block_tachygram_root: &crate::orchard::tree::Root,
+        shielded_transaction_aggregate: &Option<crate::tachyon::ShieldedTransactionAggregate>,
+    ) -> Self {
+        // The value of this hash is the BLAKE2b-256 hash personalized
+        // by the string "ZcashBlockCommit" of the following elements:
+        //   hashLightClientRoot (as described in ZIP 221)
+        //   hashAuthDataRoot    (as described in ZIP-244)
+        //   blockTachygramRoot  (the root of the block tachygram tree)
+        //   shieldedTxAggregate (serialized shielded transaction aggregate, or 32 zero bytes if None)
+        //   terminator          [0u8;32]
+
+        let mut hasher = blake2b_simd::Params::new()
+            .hash_length(32)
+            .personal(b"ZcashBlockCommit")
+            .to_state();
+
+        hasher.update(&<[u8; 32]>::from(*history_tree_root)[..]);
+        hasher.update(&<[u8; 32]>::from(*auth_data_root));
+        hasher.update(&<[u8; 32]>::from(*block_tachygram_root));
+
+        // Serialize the shielded transaction aggregate
+        // For now, if it's None, use 32 zero bytes as placeholder
+        // TODO: implement proper serialization when ShieldedTransactionAggregate has fields
+        match shielded_transaction_aggregate {
+            Some(_aggregate) => {
+                // TODO: serialize the aggregate properly
+                // For now, use a placeholder
+                hasher.update(&[0u8; 32]);
+            }
+            None => {
+                hasher.update(&[0u8; 32]);
+            }
+        }
+
+        hasher.update(&[0u8; 32]); // terminator
+
+        let hash_block_commitments: [u8; 32] = hasher
+            .finalize()
+            .as_bytes()
+            .try_into()
+            .expect("32 byte array");
+
+        Self(hash_block_commitments)
+    }
+}
+
+#[cfg(zcash_unstable = "zfuture")]
+impl ToHex for &ChainHistoryBlockTxAuthCommitmentTachygramHash {
+    fn encode_hex<T: FromIterator<char>>(&self) -> T {
+        self.bytes_in_display_order().encode_hex()
+    }
+
+    fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
+        self.bytes_in_display_order().encode_hex_upper()
+    }
+}
+
+#[cfg(zcash_unstable = "zfuture")]
+impl ToHex for ChainHistoryBlockTxAuthCommitmentTachygramHash {
+    fn encode_hex<T: FromIterator<char>>(&self) -> T {
+        (&self).encode_hex()
+    }
+
+    fn encode_hex_upper<T: FromIterator<char>>(&self) -> T {
+        (&self).encode_hex_upper()
+    }
+}
+
+#[cfg(zcash_unstable = "zfuture")]
+impl FromHex for ChainHistoryBlockTxAuthCommitmentTachygramHash {
+    type Error = <[u8; 32] as FromHex>::Error;
+
+    fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
+        let mut hash = <[u8; 32]>::from_hex(hex)?;
+        hash.reverse();
+
+        Ok(hash.into())
+    }
+}
+
 /// Errors that can occur when checking RootHash consensus rules.
 ///
 /// Each error variant corresponds to a consensus rule, so enumerating
@@ -392,6 +556,17 @@ pub enum CommitmentError {
         hex::encode(actual)
     )]
     InvalidChainHistoryBlockTxAuthCommitment {
+        expected: [u8; 32],
+        actual: [u8; 32],
+    },
+
+    #[cfg(zcash_unstable = "zfuture")]
+    #[error(
+        "invalid block commitment root with tachygram: expected {:?}, actual: {:?}",
+        hex::encode(expected),
+        hex::encode(actual)
+    )]
+    InvalidChainHistoryBlockTxAuthCommitmentTachygram {
         expected: [u8; 32],
         actual: [u8; 32],
     },

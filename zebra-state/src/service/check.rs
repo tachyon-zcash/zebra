@@ -218,6 +218,51 @@ pub(crate) fn block_commitment_is_valid_for_chain_history(
                 ))
             }
         }
+        #[cfg(zcash_unstable = "zfuture")]
+        block::Commitment::ChainHistoryBlockTxAuthCommitmentTachygram(
+            actual_hash_block_commitments,
+        ) => {
+            // # Consensus
+            //
+            // > [ZFuture onward] hashBlockCommitments MUST be set to the value of
+            // > hashBlockCommitments for this block, including tachygrams and
+            // > shielded transaction aggregates.
+            //
+            // The network is checked by [`Block::commitment`] above; it will only
+            // return the block commitments with tachygram if it's ZFuture onward.
+            let history_tree_root = history_tree
+                .hash()
+                .or_else(|| {
+                    (NetworkUpgrade::Heartwood.activation_height(network)
+                        == block.coinbase_height())
+                    .then_some(block::CHAIN_HISTORY_ACTIVATION_RESERVED.into())
+                })
+                .expect(
+                    "the history tree of the previous block must exist \
+                 since the current block has a ChainHistoryBlockTxAuthCommitmentTachygram",
+                );
+            let auth_data_root = block.auth_data_root();
+
+            use zebra_chain::block::ChainHistoryBlockTxAuthCommitmentTachygramHash;
+
+            let hash_block_commitments = ChainHistoryBlockTxAuthCommitmentTachygramHash::from_commitments(
+                &history_tree_root,
+                &auth_data_root,
+                &block.block_tachygram_root,
+                &block.shielded_transaction_aggregate,
+            );
+
+            if actual_hash_block_commitments == hash_block_commitments {
+                Ok(())
+            } else {
+                Err(ValidateContextError::InvalidBlockCommitment(
+                    CommitmentError::InvalidChainHistoryBlockTxAuthCommitmentTachygram {
+                        actual: actual_hash_block_commitments.into(),
+                        expected: hash_block_commitments.into(),
+                    },
+                ))
+            }
+        }
     }
 }
 

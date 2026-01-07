@@ -38,6 +38,9 @@ pub use commitment::{
     ChainHistoryBlockTxAuthCommitmentHash, ChainHistoryMmrRootHash, Commitment, CommitmentError,
     CHAIN_HISTORY_ACTIVATION_RESERVED,
 };
+
+#[cfg(zcash_unstable = "zfuture")]
+pub use commitment::ChainHistoryBlockTxAuthCommitmentTachygramHash;
 pub use hash::Hash;
 pub use header::{BlockTimeError, CountedHeader, Header, ZCASH_BLOCK_VERSION};
 pub use height::{Height, HeightDiff, TryIntoHeight};
@@ -59,6 +62,15 @@ pub struct Block {
     pub transactions: Vec<Arc<Transaction>>,
     /// The block tachygrams
     pub tachygrams: Option<Vec<tachyon::Tachygram>>,
+    /// The shielded transaction aggregate
+    pub shielded_transaction_aggregate: Option<tachyon::ShieldedTransactionAggregate>,
+    /// The root of the block tachygram Merkle tree.
+    ///
+    /// This tree commits to the tachygrams in this block and chains to the
+    /// previous block's tachygram root. The first leaf is the previous block's
+    /// block_tachygram_root, and the remaining leaves are the tachygrams from
+    /// this block's tachygrams field.
+    pub block_tachygram_root: orchard::tree::Root,
 }
 
 impl fmt::Display for Block {
