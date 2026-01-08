@@ -362,6 +362,8 @@ impl Arbitrary for Block {
                 header: header.into(),
                 transactions,
                 tachygrams: None,
+                shielded_transaction_aggregate: None,
+                block_tachygram_root: Default::default(),
             })
             .boxed()
     }

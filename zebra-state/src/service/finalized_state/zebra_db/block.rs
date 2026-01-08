@@ -174,6 +174,8 @@ impl ZebraDb {
             header,
             transactions,
             tachygrams: None,
+            shielded_transaction_aggregate: None,
+            block_tachygram_root: Default::default(),
         }))
     }
 
@@ -209,6 +211,8 @@ impl ZebraDb {
             header,
             transactions: txs,
             tachygrams: None,
+            shielded_transaction_aggregate: None,
+            block_tachygram_root: Default::default(),
         };
         Some((Arc::new(block), size))
     }

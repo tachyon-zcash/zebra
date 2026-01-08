@@ -59,6 +59,10 @@ pub struct Block {
     pub transactions: Vec<Arc<Transaction>>,
     /// The block tachygrams
     pub tachygrams: Option<Vec<tachyon::Tachygram>>,
+    /// The shielded transaction aggregate
+    pub shielded_transaction_aggregate: Option<tachyon::ShieldedTransactionAggregate>,
+    /// The block tachygram root
+    pub block_tachygram_root: orchard::tree::Root,
 }
 
 impl fmt::Display for Block {
