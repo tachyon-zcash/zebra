@@ -139,6 +139,8 @@ fn multi_transaction_block(oversized: bool) -> Block {
         header: block_header.into(),
         transactions,
         tachygrams: None,
+        shielded_transaction_aggregate: None,
+        block_tachygram_root: crate::orchard::tree::Root::default(),
     };
 
     let serialized_len = block.zcash_serialize_to_vec().unwrap().len();
@@ -212,6 +214,8 @@ fn single_transaction_block_many_inputs(oversized: bool) -> Block {
         header: block_header.into(),
         transactions,
         tachygrams: None,
+        shielded_transaction_aggregate: None,
+        block_tachygram_root: crate::orchard::tree::Root::default(),
     };
 
     let serialized_len = block.zcash_serialize_to_vec().unwrap().len();
@@ -283,6 +287,8 @@ fn single_transaction_block_many_outputs(oversized: bool) -> Block {
         header: block_header.into(),
         transactions,
         tachygrams: None,
+        shielded_transaction_aggregate: None,
+        block_tachygram_root: crate::orchard::tree::Root::default(),
     };
 
     let serialized_len = block.zcash_serialize_to_vec().unwrap().len();
