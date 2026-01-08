@@ -39,6 +39,9 @@ pub fn block_no_transactions() -> Block {
             .zcash_deserialize_into()
             .unwrap(),
         transactions: Vec::new(),
+        tachygrams: None,
+        shielded_transaction_aggregate: None,
+        block_tachygram_root: zebra_chain::orchard::tree::Root::default(),
     }
 }
 

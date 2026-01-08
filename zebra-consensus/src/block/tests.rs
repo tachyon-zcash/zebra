@@ -82,6 +82,9 @@ static INVALID_COINBASE_TRANSCRIPT: Lazy<
     let block1 = Block {
         header: header.into(),
         transactions: Vec::new(),
+        tachygrams: None,
+        shielded_transaction_aggregate: None,
+        block_tachygram_root: zebra_chain::orchard::tree::Root::default(),
     };
 
     // Test 2: Transaction at first position is not coinbase
@@ -93,6 +96,9 @@ static INVALID_COINBASE_TRANSCRIPT: Lazy<
     let block2 = Block {
         header: header.into(),
         transactions,
+        tachygrams: None,
+        shielded_transaction_aggregate: None,
+        block_tachygram_root: zebra_chain::orchard::tree::Root::default(),
     };
 
     // Test 3: Invalid coinbase position
@@ -477,6 +483,9 @@ fn funding_stream_validation_failure() -> Result<(), Report> {
     let block = Block {
         header: block.header.clone(),
         transactions,
+        tachygrams: None,
+        shielded_transaction_aggregate: None,
+        block_tachygram_root: zebra_chain::orchard::tree::Root::default(),
     };
 
     // Validate it
