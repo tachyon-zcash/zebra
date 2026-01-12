@@ -84,7 +84,7 @@ static INVALID_COINBASE_TRANSCRIPT: Lazy<
         transactions: Vec::new(),
         tachygrams: None,
         shielded_transaction_aggregate: None,
-        block_tachygram_root: zebra_chain::orchard::tree::Root::default(),
+        tachyon_accumulator: zebra_chain::orchard::tree::Root::default(),
     };
 
     // Test 2: Transaction at first position is not coinbase
@@ -98,7 +98,7 @@ static INVALID_COINBASE_TRANSCRIPT: Lazy<
         transactions,
         tachygrams: None,
         shielded_transaction_aggregate: None,
-        block_tachygram_root: zebra_chain::orchard::tree::Root::default(),
+        tachyon_accumulator: zebra_chain::orchard::tree::Root::default(),
     };
 
     // Test 3: Invalid coinbase position
@@ -485,7 +485,7 @@ fn funding_stream_validation_failure() -> Result<(), Report> {
         transactions,
         tachygrams: None,
         shielded_transaction_aggregate: None,
-        block_tachygram_root: zebra_chain::orchard::tree::Root::default(),
+        tachyon_accumulator: zebra_chain::orchard::tree::Root::default(),
     };
 
     // Validate it

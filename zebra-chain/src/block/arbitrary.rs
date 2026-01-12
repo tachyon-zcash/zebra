@@ -363,7 +363,7 @@ impl Arbitrary for Block {
                 transactions,
                 tachygrams: None,
                 shielded_transaction_aggregate: None,
-                block_tachygram_root: Default::default(),
+                tachyon_accumulator: Default::default(),
             })
             .boxed()
     }

@@ -61,8 +61,8 @@ pub struct Block {
     pub tachygrams: Option<Vec<tachyon::Tachygram>>,
     /// The shielded transaction aggregate
     pub shielded_transaction_aggregate: Option<tachyon::ShieldedTransactionAggregate>,
-    /// The block tachygram root
-    pub block_tachygram_root: orchard::tree::Root,
+    /// The tachyon accumulator
+    pub tachyon_accumulator: orchard::tree::Root,
 }
 
 impl fmt::Display for Block {
@@ -256,6 +256,133 @@ impl Block {
     /// [ZIP-244]: https://zips.z.cash/zip-0244
     pub fn auth_data_root(&self) -> AuthDataRoot {
         self.transactions.iter().collect::<AuthDataRoot>()
+    }
+
+    /// Compute the tachyon accumulator value.
+    ///
+    /// The accumulator is computed as:
+    /// hash(previous_accumulator_value || tachygram_tree_root)
+    /// where || denotes concatenation and tachygram_tree_root is the root of the
+    /// Merkle tree of tachygrams in this block.
+    ///
+    /// Returns the computed accumulator that should match the `tachyon_accumulator` field
+    /// in this block's header.
+    pub fn compute_tachyon_accumulator(
+        &self,
+        previous_tachyon_accumulator: orchard::tree::Root,
+    ) -> orchard::tree::Root {
+        // Compute the root of the tree of tachygrams in this block
+        let mut tachygram_leaves: Vec<pallas::Base> = Vec::new();
+
+        // Add leaves for each tachygram in this block
+        if let Some(ref tachygrams) = self.tachygrams {
+            for tachygram in tachygrams {
+                tachygram_leaves.push(tachygram.extract_x());
+            }
+        }
+
+        let tachygram_tree_root = if tachygram_leaves.is_empty() {
+            orchard::tree::Root::default()
+        } else {
+            Self::compute_merkle_root(&tachygram_leaves)
+        };
+
+        // Hash the concatenation of previous accumulator + current tachygram tree root
+        Self::hash_accumulator_values(previous_tachyon_accumulator, tachygram_tree_root)
+    }
+
+    /// Hash two orchard tree roots together to produce a new accumulator value.
+    ///
+    /// This uses Sinsemilla hash similar to the Orchard merkle tree implementation.
+    fn hash_accumulator_values(
+        previous_accumulator: orchard::tree::Root,
+        tachygram_tree_root: orchard::tree::Root,
+    ) -> orchard::tree::Root {
+        use bitvec::prelude::*;
+        use halo2::pasta::group::ff::PrimeField;
+
+        let mut s = bitvec![u8, Lsb0;];
+        
+        // Concatenate the bit representations of both values
+        // Convert each pallas::Base to its 255-bit representation
+        s.extend_from_bitslice(&BitArray::<_, Lsb0>::from(previous_accumulator.0.to_repr())[0..255]);
+        s.extend_from_bitslice(&BitArray::<_, Lsb0>::from(tachygram_tree_root.0.to_repr())[0..255]);
+
+        // Use Sinsemilla hash with a domain specific to tachyon accumulator
+        match orchard::sinsemilla::sinsemilla_hash(b"z.cash:Tachyon-Accumulator", &s) {
+            Some(h) => orchard::tree::Root::from(h),
+            None => orchard::tree::Root::default(),
+        }
+    }
+
+    fn compute_merkle_root(leaves: &[pallas::Base]) -> orchard::tree::Root {
+        if leaves.is_empty() {
+            return orchard::tree::Root::default();
+        }
+
+        if leaves.len() == 1 {
+            return orchard::tree::Root::from(leaves[0]);
+        }
+
+        // Build the tree bottom-up
+        let mut current_level = leaves.to_vec();
+        let mut layer: u8 = Self::compute_tree_depth(leaves.len()) - 1;
+
+        while current_level.len() > 1 {
+            let mut next_level = Vec::new();
+
+            for chunk in current_level.chunks(2) {
+                let left = chunk[0];
+                let right = if chunk.len() == 2 {
+                    chunk[1]
+                } else {
+                    // If odd number of nodes, duplicate the last one
+                    chunk[0]
+                };
+
+                // Use the Orchard merkle hash function
+                next_level.push(Self::merkle_hash_orchard(layer, left, right));
+            }
+
+            current_level = next_level;
+            layer = layer.saturating_sub(1);
+        }
+
+        orchard::tree::Root::from(current_level[0])
+    }
+
+    /// Compute the depth of a merkle tree needed to hold `leaf_count` leaves.
+    fn compute_tree_depth(leaf_count: usize) -> u8 {
+        if leaf_count <= 1 {
+            return 0;
+        }
+        // Depth is ceil(log2(leaf_count))
+        (leaf_count.next_power_of_two().trailing_zeros() as u8)
+            .max(1)
+    }
+
+    /// MerkleCRH^Orchard Hash Function
+    ///
+    /// This is the same hash function used in the Orchard note commitment tree.
+    /// Uses SinsemillaHash to combine two pallas::Base values at a given layer.
+    fn merkle_hash_orchard(layer: u8, left: pallas::Base, right: pallas::Base) -> pallas::Base {
+        use bitvec::prelude::*;
+        use halo2::pasta::group::ff::PrimeField;
+
+        const MERKLE_DEPTH: u8 = 32;
+
+        let mut s = bitvec![u8, Lsb0;];
+
+        // Prefix: l = I2LEBSP_10(MerkleDepth - 1 - layer)
+        let l = MERKLE_DEPTH - 1 - layer;
+        s.extend_from_bitslice(&BitArray::<_, Lsb0>::from([l, 0])[0..10]);
+        s.extend_from_bitslice(&BitArray::<_, Lsb0>::from(left.to_repr())[0..255]);
+        s.extend_from_bitslice(&BitArray::<_, Lsb0>::from(right.to_repr())[0..255]);
+
+        match orchard::sinsemilla::sinsemilla_hash(b"z.cash:Orchard-MerkleCRH", &s) {
+            Some(h) => h,
+            None => pallas::Base::zero(),
+        }
     }
 }
 

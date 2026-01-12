@@ -161,7 +161,7 @@ impl ZcashDeserialize for Block {
             transactions: limited_reader.zcash_deserialize_into()?,
             tachygrams: None,
             shielded_transaction_aggregate: None,
-            block_tachygram_root: Default::default(),
+            tachyon_accumulator: Default::default(),
         })
     }
 }

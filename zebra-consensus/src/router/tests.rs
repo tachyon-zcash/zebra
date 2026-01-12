@@ -41,7 +41,7 @@ pub fn block_no_transactions() -> Block {
         transactions: Vec::new(),
         tachygrams: None,
         shielded_transaction_aggregate: None,
-        block_tachygram_root: zebra_chain::orchard::tree::Root::default(),
+        tachyon_accumulator: zebra_chain::orchard::tree::Root::default(),
     }
 }
 
