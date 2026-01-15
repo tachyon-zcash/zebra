@@ -155,8 +155,8 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 use zcash_keys::address::Address;
-
 use zcash_protocol::PoolType;
+
 use zebra_chain::{
     block::{self, genesis::regtest_genesis_block, ChainHistoryBlockTxAuthCommitmentHash, Height},
     parameters::{
@@ -3661,6 +3661,240 @@ async fn nu6_funding_streams_and_coinbase_balance() -> Result<()> {
         SubmitBlockResponse::Accepted,
         "valid block should be accepted"
     );
+
+    Ok(())
+}
+
+/// Test ZIP 213 OVK compliance for Sapling shielded coinbase (integration test).
+///
+/// ZIP 213 requires shielded coinbase outputs be recoverable with
+/// an all-zeros outgoing viewing key for supply auditability.
+///
+/// This is a full integration test that:
+/// - Sets up state services and block verifier
+/// - Commits the genesis block
+/// - Gets a block template via RPC with shielded coinbase
+/// - Verifies the coinbase decrypts with ZIP 213 all-zeros OVK
+/// - Submits the block and verifies it's accepted
+///
+/// This test can be run locally with:
+/// `cargo test --package zebrad --test acceptance --features shielded-mining-sapling -- sapling_shielded_coinbase_zip213_ovk --exact --show-output`
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "shielded-mining-sapling")]
+async fn sapling_shielded_coinbase_zip213_ovk() -> Result<()> {
+    use zcash_protocol::ShieldedProtocol;
+    use zebra_chain::{
+        chain_sync_status::MockSyncStatus,
+        parameters::testnet::{self, ConfiguredActivationHeights, ConfiguredFundingStreams},
+        primitives::zcash_note_encryption::decrypts_successfully,
+        serialization::{ZcashDeserializeInto, ZcashSerialize},
+        work::difficulty::U256,
+    };
+    use zebra_network::address_book_peers::MockAddressBookPeers;
+    use zebra_node_services::mempool;
+    use zebra_rpc::client::HexData;
+    use zebra_test::mock_service::MockService;
+
+    let _init_guard = zebra_test::init();
+
+    tracing::info!("running sapling_shielded_coinbase_zip213_ovk test");
+
+    // Build a regtest network with Nu5 enabled
+    let network = testnet::Parameters::build()
+        .with_genesis_hash("029f11d80ef9765602235e1bc9727e3eb6ba20839319f761fee920d63401e327")
+        .expect("failed to set genesis hash")
+        .with_checkpoints(false)
+        .expect("failed to verify checkpoints")
+        .with_target_difficulty_limit(U256::from_big_endian(&[0x0f; 32]))
+        .expect("failed to set target difficulty limit")
+        .with_disable_pow(true)
+        .with_slow_start_interval(Height::MIN)
+        .with_activation_heights(ConfiguredActivationHeights {
+            nu5: Some(1),
+            ..Default::default()
+        })
+        .expect("failed to set activation heights")
+        .with_funding_streams(vec![ConfiguredFundingStreams {
+            height_range: Some(Height(1)..Height(100)),
+            recipients: None,
+        }])
+        .to_network()
+        .expect("failed to build configured network");
+
+    tracing::info!("built configured Testnet, starting state service and block verifier");
+
+    // Get miner address from default test config (uses Unified Address with Sapling receiver)
+    let default_test_config = default_test_config(&network)?;
+    let mut mining_config = default_test_config.mining;
+
+    // Configure for Sapling shielded coinbase
+    mining_config.miner_pool = Some(PoolType::Shielded(ShieldedProtocol::Sapling));
+
+    let miner_address = Address::try_from_zcash_address(
+        &network,
+        mining_config
+            .miner_address
+            .clone()
+            .expect("mining address should be configured"),
+    )
+    .expect("configured mining address should be valid");
+
+    // Verify the address has a Sapling receiver
+    assert!(
+        miner_address.to_sapling_address().is_some(),
+        "default test config address should have a Sapling receiver"
+    );
+
+    // Initialize state and consensus services
+    let (state, read_state, latest_chain_tip, _chain_tip_change) =
+        zebra_state::init_test_services(&network).await;
+
+    let (
+        block_verifier_router,
+        _transaction_verifier,
+        _parameter_download_task_handle,
+        _max_checkpoint_height,
+    ) = zebra_consensus::router::init_test(
+        zebra_consensus::Config::default(),
+        &network,
+        state.clone(),
+    )
+    .await;
+
+    tracing::info!("started state service and block verifier, committing Regtest genesis block");
+
+    // Commit genesis block
+    let genesis_hash = block_verifier_router
+        .clone()
+        .oneshot(zebra_consensus::Request::Commit(regtest_genesis_block()))
+        .await
+        .expect("should validate Regtest genesis block");
+
+    // Set up mock services
+    let mut mempool = MockService::build()
+        .with_max_request_delay(Duration::from_secs(5))
+        .for_unit_tests();
+    let mut mock_sync_status = MockSyncStatus::default();
+    mock_sync_status.set_is_close_to_tip(true);
+
+    let submitblock_channel = SubmitBlockChannel::new();
+    let (_tx, rx) = tokio::sync::watch::channel(None);
+
+    // Create RPC implementation
+    let (rpc, _) = RpcImpl::new(
+        network.clone(),
+        mining_config,
+        false,
+        "0.0.1",
+        "Zebra tests",
+        mempool.clone(),
+        state.clone(),
+        read_state.clone(),
+        block_verifier_router,
+        mock_sync_status,
+        latest_chain_tip,
+        MockAddressBookPeers::default(),
+        rx,
+        Some(submitblock_channel.sender()),
+    );
+
+    // Get block template via RPC
+    let make_mock_mempool_request_handler = || async move {
+        mempool
+            .expect_request(mempool::Request::FullTransactions)
+            .await
+            .respond(mempool::Response::FullTransactions {
+                transactions: vec![],
+                transaction_dependencies: Default::default(),
+                last_seen_tip_hash: genesis_hash,
+            });
+    };
+
+    let block_template_fut = rpc.get_block_template(None);
+    let mock_mempool_request_handler = make_mock_mempool_request_handler.clone()();
+    let (block_template, _) = tokio::join!(block_template_fut, mock_mempool_request_handler);
+
+    let GetBlockTemplateResponse::TemplateMode(block_template) =
+        block_template.expect("unexpected error in getblocktemplate RPC call")
+    else {
+        panic!(
+            "this getblocktemplate call without parameters should return the `TemplateMode` variant of the response"
+        )
+    };
+
+    tracing::info!("got block template, verifying shielded coinbase");
+
+    // Deserialize coinbase transaction from template
+    let coinbase_data = block_template.coinbase_txn().data();
+    let coinbase_tx: zebra_chain::transaction::Transaction = coinbase_data
+        .as_ref()
+        .zcash_deserialize_into()
+        .expect("coinbase should deserialize");
+
+    // Verify coinbase has Sapling shielded data
+    assert!(
+        coinbase_tx.has_sapling_shielded_data(),
+        "coinbase transaction should have Sapling shielded data"
+    );
+
+    // Verify ZIP 213 OVK compliance - outputs decrypt with all-zeros OVK
+    let height = Height(block_template.height());
+    assert!(
+        decrypts_successfully(&coinbase_tx, &network, height),
+        "coinbase outputs should decrypt with all-zeros OVK per ZIP 213"
+    );
+
+    tracing::info!("ZIP 213 OVK verification passed, submitting block");
+
+    // Build and submit the block
+    let proposal_block = proposal_block_from_template(&block_template, None, &network)?;
+    let hex_proposal_block = HexData(proposal_block.zcash_serialize_to_vec()?);
+
+    // Verify block proposal is valid
+    let GetBlockTemplateResponse::ProposalMode(block_proposal_result) = rpc
+        .get_block_template(Some(GetBlockTemplateParameters::new(
+            GetBlockTemplateRequestMode::Proposal,
+            Some(hex_proposal_block),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )))
+        .await?
+    else {
+        panic!(
+            "this getblocktemplate call should return the `ProposalMode` variant of the response"
+        )
+    };
+
+    assert!(
+        block_proposal_result.is_valid(),
+        "block with shielded coinbase should be a valid proposal"
+    );
+
+    // Submit the block
+    let submit_block_response = rpc
+        .submit_block(HexData(proposal_block.zcash_serialize_to_vec()?), None)
+        .await?;
+
+    assert_eq!(
+        submit_block_response,
+        SubmitBlockResponse::Accepted,
+        "block with shielded coinbase should be accepted"
+    );
+
+    // Check that the submitblock channel received the submitted block
+    let mut submit_block_receiver = submitblock_channel.receiver();
+    let submit_block_channel_data = submit_block_receiver.recv().await.expect("channel is open");
+    assert_eq!(
+        submit_block_channel_data,
+        (
+            proposal_block.hash(),
+            proposal_block.coinbase_height().unwrap()
+        ),
+        "submitblock channel should receive the submitted block"
+    );
+
+    tracing::info!("block with shielded coinbase accepted successfully");
 
     Ok(())
 }
