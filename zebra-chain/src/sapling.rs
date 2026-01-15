@@ -15,6 +15,10 @@ mod note;
 
 #[cfg(any(test, feature = "proptest-impl"))]
 mod arbitrary;
+
+#[cfg(feature = "shielded-mining-sapling")]
+pub mod coinbase;
+
 #[cfg(test)]
 mod tests;
 

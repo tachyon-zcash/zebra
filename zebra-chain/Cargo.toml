@@ -32,6 +32,9 @@ async-error = [
 # Experimental internal miner support
 internal-miner = ["equihash/solver"]
 
+# Shielded coinbase mining (ZIP 213)
+shielded-mining-sapling = ["zcash_proofs", "rand", "zcash_keys/sapling"]
+
 # Experimental elasticsearch support
 elasticsearch = []
 
@@ -89,6 +92,7 @@ zcash_history.workspace = true
 zcash_note_encryption = { workspace = true }
 zcash_primitives = { workspace = true, features = ["transparent-inputs"] }
 sapling-crypto.workspace = true
+zcash_keys = { workspace = true }
 zcash_protocol.workspace = true
 zcash_address.workspace = true
 zcash_transparent.workspace = true
@@ -121,6 +125,9 @@ reddsa = { workspace = true }
 
 # Production feature json-conversion
 serde_json = { workspace = true, optional = true }
+
+# Experimental shielded coinbase mining (ZIP 213) dependencies
+zcash_proofs = { workspace = true, features = ["bundled-prover"], optional = true }
 
 # Production feature async-error and testing feature proptest-impl
 tokio = { workspace = true, optional = true }

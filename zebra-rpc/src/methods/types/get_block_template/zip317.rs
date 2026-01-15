@@ -15,6 +15,8 @@ use rand::{
 
 use zcash_keys::address::Address;
 
+#[cfg(not(all(zcash_unstable = "nu7", feature = "tx_v6")))]
+use zcash_protocol::PoolType;
 use zebra_chain::{
     amount::NegativeOrZero,
     block::{Height, MAX_BLOCK_BYTES},
@@ -38,7 +40,7 @@ mod tests;
 #[cfg(test)]
 use crate::methods::types::get_block_template::InBlockTxDependenciesDepth;
 
-use super::standard_coinbase_outputs;
+use super::coinbase_outputs;
 
 /// Used in the return type of [`select_mempool_transactions()`] for test compilations.
 #[cfg(test)]
@@ -168,10 +170,19 @@ pub fn fake_coinbase_transaction(
     // so one zat has the same size as the real amount:
     // https://developer.bitcoin.org/reference/transactions.html#txout-a-transaction-output
     let miner_fee = 1.try_into().expect("amount is valid and non-negative");
-    let outputs = standard_coinbase_outputs(net, height, miner_address, miner_fee);
+    let (miner_reward, outputs) = coinbase_outputs(net, height, miner_fee);
 
     #[cfg(not(all(zcash_unstable = "nu7", feature = "tx_v6")))]
-    let coinbase = Transaction::new_v5_coinbase(net, height, outputs, extra_coinbase_data).into();
+    let coinbase = Transaction::new_v5_coinbase(
+        net,
+        height,
+        outputs,
+        miner_reward,
+        PoolType::Transparent,
+        miner_address,
+        extra_coinbase_data,
+    )
+    .into();
 
     #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
     let coinbase = {

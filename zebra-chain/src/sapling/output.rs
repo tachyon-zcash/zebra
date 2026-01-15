@@ -71,6 +71,32 @@ pub struct OutputPrefixInTransactionV5 {
 }
 
 impl Output {
+    /// Creates a dummy Output for size estimation.
+    ///
+    /// All Output fields are fixed-size, so this dummy instance serializes to the
+    /// same size (948 bytes) as any real Output. Uses the JubJub generator point
+    /// for cv and ephemeral_key since these require valid non-small-order points.
+    pub fn dummy() -> Self {
+        use group::Group;
+
+        let generator = jubjub::ExtendedPoint::generator();
+
+        Output {
+            cv: commitment::ValueCommitment(
+                sapling_crypto::value::ValueCommitment::from_bytes_not_small_order(
+                    &jubjub::AffinePoint::from(generator).to_bytes(),
+                )
+                .expect("generator is valid"),
+            ),
+            cm_u: sapling_crypto::note::ExtractedNoteCommitment::from_bytes(&[0u8; 32])
+                .expect("zeros valid"),
+            ephemeral_key: keys::EphemeralPublicKey(generator.into()),
+            enc_ciphertext: note::EncryptedNote([0u8; 580]),
+            out_ciphertext: note::WrappedNoteKey([0u8; 80]),
+            zkproof: Groth16Proof([0u8; 192]),
+        }
+    }
+
     /// Remove the V4 transaction wrapper from this output.
     pub fn from_v4(output: OutputInTransactionV4) -> Output {
         output.0

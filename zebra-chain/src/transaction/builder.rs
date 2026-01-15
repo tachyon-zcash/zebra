@@ -1,27 +1,49 @@
 //! Methods for building transactions.
 
+use zcash_keys::address::Address;
+use zcash_protocol::{PoolType, ShieldedProtocol};
+use zcash_script::script::Evaluable;
+
 use crate::{
     amount::{Amount, NonNegative},
     block::Height,
+    orchard,
     parameters::{Network, NetworkUpgrade},
+    sapling,
     transaction::{LockTime, Transaction},
     transparent,
 };
 
+use sapling_crypto::{
+    builder::{InProgress, Proven, Unsigned},
+    bundle::Bundle,
+};
+
+#[cfg(feature = "shielded-mining-sapling")]
+use {crate::transaction::HashType, rand::rngs::OsRng};
+
 impl Transaction {
     /// Returns a new version 6 coinbase transaction for `network` and `height`,
-    /// which contains the specified `outputs`.
+    /// with the miner reward going to `miner_address` via `miner_pool`.
     #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
     pub fn new_v6_coinbase(
         network: &Network,
         height: Height,
-        outputs: impl IntoIterator<Item = (Amount<NonNegative>, transparent::Script)>,
+        outputs: Vec<(Amount<NonNegative>, transparent::Script)>,
+        miner_reward: Amount<NonNegative>,
+        miner_pool: PoolType,
+        miner_address: &Address,
         miner_data: Vec<u8>,
         zip233_amount: Option<Amount<NonNegative>>,
     ) -> Transaction {
+        let (outputs, sapling_shielded_data, sapling_proven_bundle) =
+            build_coinbase_outputs(miner_pool, miner_address, miner_reward, outputs);
+
+        let orchard_shielded_data: Option<orchard::ShieldedData> = None;
+
         // # Consensus
         //
-        // These consensus rules apply to v5 coinbase transactions after NU5 activation:
+        // These consensus rules apply to v6 coinbase transactions:
         //
         // > If effectiveVersion ≥ 5 then this condition MUST hold:
         // > tx_in_count > 0 or nSpendsSapling > 0 or
@@ -61,18 +83,24 @@ impl Transaction {
         // > (nActionsOrchard > 0 and enableOutputsOrchard = 1).
         //
         // <https://zips.z.cash/protocol/protocol.pdf#txnconsensus>
-        let outputs: Vec<_> = outputs
-            .into_iter()
-            .map(|(amount, lock_script)| transparent::Output::new_coinbase(amount, lock_script))
-            .collect();
-        assert!(
-            !outputs.is_empty(),
+        //
+        // With shielded coinbase (ZIP 213), transparent outputs may be empty if there
+        // are no funding streams.
+        assert_ne!(
+            outputs.len()
+                + sapling_shielded_data
+                    .as_ref()
+                    .map_or(0, |data| data.outputs().count())
+                + orchard_shielded_data
+                    .as_ref()
+                    .map_or(0, |_| unimplemented!() as usize),
+            0,
             "invalid coinbase transaction: must have at least one output"
         );
 
-        Transaction::V6 {
-            // > The transaction version number MUST be 4 or 5. ...
-            // > If the transaction version number is 5 then the version group ID
+        let tx = Transaction::V6 {
+            // > The transaction version number MUST be 4, 5, or 6. ...
+            // > If the transaction version number is 6 then the version group ID
             // > MUST be 0x26A7270A.
             // > If effectiveVersion ≥ 5, the nConsensusBranchId field MUST match the consensus
             // > branch ID used for SIGHASH transaction hashes, as specified in [ZIP-244].
@@ -86,32 +114,47 @@ impl Transaction {
             // > block height.
             expiry_height: height,
 
-            // > The NSM zip233_amount field [ZIP-233] must be set. It must be >= 0.
             zip233_amount: zip233_amount.unwrap_or(Amount::zero()),
 
             inputs,
             outputs,
 
-            // Zebra does not support shielded coinbase yet.
-            //
-            // > In a version 5 coinbase transaction, the enableSpendsOrchard flag MUST be 0.
-            // > In a version 5 transaction, the reserved bits 2 .. 7 of the flagsOrchard field
+            // > In a version 6 coinbase transaction, the enableSpendsOrchard flag MUST be 0.
+            // > In a version 6 transaction, the reserved bits 2 .. 7 of the flagsOrchard field
             // > MUST be zero.
             //
             // See the Zcash spec for additional shielded coinbase consensus rules.
-            sapling_shielded_data: None,
-            orchard_shielded_data: None,
-        }
+            sapling_shielded_data,
+            orchard_shielded_data,
+        };
+
+        assert_eq!(
+            tx.has_sapling_shielded_data(),
+            sapling_proven_bundle.is_some(),
+        );
+
+        #[cfg(feature = "shielded-mining-sapling")]
+        let tx = update_coinbase_binding_sig(tx, network, height, sapling_proven_bundle);
+
+        tx
     }
 
     /// Returns a new version 5 coinbase transaction for `network` and `height`,
-    /// which contains the specified `outputs`.
+    /// with the miner reward going to `miner_address` via `miner_pool`.
     pub fn new_v5_coinbase(
         network: &Network,
         height: Height,
-        outputs: impl IntoIterator<Item = (Amount<NonNegative>, transparent::Script)>,
+        outputs: Vec<(Amount<NonNegative>, transparent::Script)>,
+        miner_reward: Amount<NonNegative>,
+        miner_pool: PoolType,
+        miner_address: &Address,
         miner_data: Vec<u8>,
     ) -> Transaction {
+        let (outputs, sapling_shielded_data, sapling_proven_bundle) =
+            build_coinbase_outputs(miner_pool, miner_address, miner_reward, outputs);
+
+        let orchard_shielded_data: Option<orchard::ShieldedData> = None;
+
         // # Consensus
         //
         // These consensus rules apply to v5 coinbase transactions after NU5 activation:
@@ -154,17 +197,22 @@ impl Transaction {
         // > (nActionsOrchard > 0 and enableOutputsOrchard = 1).
         //
         // <https://zips.z.cash/protocol/protocol.pdf#txnconsensus>
-        let outputs: Vec<_> = outputs
-            .into_iter()
-            .map(|(amount, lock_script)| transparent::Output::new_coinbase(amount, lock_script))
-            .collect();
-
-        assert!(
-            !outputs.is_empty(),
+        //
+        // With shielded coinbase (ZIP 213), transparent outputs may be empty if there
+        // are no funding streams.
+        assert_ne!(
+            outputs.len()
+                + sapling_shielded_data
+                    .as_ref()
+                    .map_or(0, |data| data.outputs().count())
+                + orchard_shielded_data
+                    .as_ref()
+                    .map_or(0, |_| unimplemented!() as usize),
+            0,
             "invalid coinbase transaction: must have at least one output"
         );
 
-        Transaction::V5 {
+        let tx = Transaction::V5 {
             // > The transaction version number MUST be 4 or 5. ...
             // > If the transaction version number is 5 then the version group ID
             // > MUST be 0x26A7270A.
@@ -183,28 +231,46 @@ impl Transaction {
             inputs,
             outputs,
 
-            // Zebra does not support shielded coinbase yet.
-            //
             // > In a version 5 coinbase transaction, the enableSpendsOrchard flag MUST be 0.
             // > In a version 5 transaction, the reserved bits 2 .. 7 of the flagsOrchard field
             // > MUST be zero.
             //
             // See the Zcash spec for additional shielded coinbase consensus rules.
-            sapling_shielded_data: None,
-            orchard_shielded_data: None,
-        }
+            sapling_shielded_data,
+            orchard_shielded_data,
+        };
+
+        assert_eq!(
+            tx.has_sapling_shielded_data(),
+            sapling_proven_bundle.is_some(),
+        );
+
+        #[cfg(feature = "shielded-mining-sapling")]
+        let tx = update_coinbase_binding_sig(tx, network, height, sapling_proven_bundle);
+
+        tx
     }
 
-    /// Returns a new version 4 coinbase transaction for `network` and `height`,
-    /// which contains the specified `outputs`.
-    ///
-    /// If `like_zcashd` is true, try to match the coinbase transactions generated by `zcashd`
-    /// in the `getblocktemplate` RPC.
+    /// Returns a new version 4 coinbase transaction for `height`,
+    /// with the miner reward going to `miner_address` via `miner_pool`.
     pub fn new_v4_coinbase(
         height: Height,
-        outputs: impl IntoIterator<Item = (Amount<NonNegative>, transparent::Script)>,
+        outputs: Vec<(Amount<NonNegative>, transparent::Script)>,
+        miner_pool: PoolType,
+        miner_reward: Amount<NonNegative>,
+        miner_address: &Address,
         miner_data: Vec<u8>,
     ) -> Transaction {
+        // V4 coinbase only supports transparent miner pool
+        assert_eq!(
+            miner_pool,
+            PoolType::Transparent,
+            "v4 coinbase only supports transparent miner pool"
+        );
+
+        let (outputs, _, _) =
+            build_coinbase_outputs(miner_pool, miner_address, miner_reward, outputs);
+
         // # Consensus
         //
         // See the other consensus rules above in new_v5_coinbase().
@@ -220,11 +286,6 @@ impl Transaction {
 
         // > If effectiveVersion < 5, then at least one of tx_out_count, nOutputsSapling,
         // > and nJoinSplit MUST be nonzero.
-        let outputs: Vec<_> = outputs
-            .into_iter()
-            .map(|(amount, lock_script)| transparent::Output::new_coinbase(amount, lock_script))
-            .collect();
-
         assert!(
             !outputs.is_empty(),
             "invalid coinbase transaction: must have at least one output"
@@ -241,4 +302,117 @@ impl Transaction {
             sapling_shielded_data: None,
         }
     }
+}
+
+/// Builds coinbase outputs based on `miner_pool`.
+///
+/// For transparent mining, adds the miner reward to the funding outputs.
+/// For Sapling mining, creates shielded data for the miner reward.
+fn build_coinbase_outputs(
+    miner_pool: PoolType,
+    miner_address: &Address,
+    miner_reward: Amount<NonNegative>,
+    funding_outputs: Vec<(Amount<NonNegative>, transparent::Script)>,
+) -> (
+    Vec<transparent::Output>,
+    Option<sapling::ShieldedData<sapling::SharedAnchor>>,
+    Option<Bundle<InProgress<Proven, Unsigned>, i64>>,
+) {
+    let (outputs, sapling_shielded_data, sapling_proven_bundle) = match miner_pool {
+        PoolType::Transparent => {
+            let mut outputs = funding_outputs;
+            outputs.insert(
+                0,
+                (
+                    miner_reward,
+                    transparent::Script::new(
+                        &miner_address
+                            .to_transparent_address()
+                            .expect("address must have a transparent component")
+                            .script()
+                            .to_bytes(),
+                    ),
+                ),
+            );
+            (outputs, None, None)
+        }
+        #[cfg(feature = "shielded-mining-sapling")]
+        PoolType::Shielded(ShieldedProtocol::Sapling) => {
+            let (shielded_data, bundle) = sapling::coinbase::build_shielded_coinbase(
+                miner_address
+                    .to_sapling_address()
+                    .expect("miner_address must support sapling"),
+                miner_reward,
+            );
+            (funding_outputs, Some(shielded_data), Some(bundle))
+        }
+        #[cfg(not(feature = "shielded-mining-sapling"))]
+        PoolType::Shielded(ShieldedProtocol::Sapling) => {
+            unreachable!("shielded mining feature must be enabled")
+        }
+        PoolType::Shielded(ShieldedProtocol::Orchard) => {
+            unimplemented!("Orchard shielded coinbase not yet implemented")
+        }
+    };
+
+    let outputs = outputs
+        .into_iter()
+        .map(|(amount, lock_script)| transparent::Output::new_coinbase(amount, lock_script))
+        .collect();
+
+    (outputs, sapling_shielded_data, sapling_proven_bundle)
+}
+
+/// Authorizes the Sapling binding signature for a coinbase transaction.
+#[cfg(feature = "shielded-mining-sapling")]
+fn update_coinbase_binding_sig(
+    mut draft_tx: Transaction,
+    network: &Network,
+    height: Height,
+    sapling_proven_bundle: Option<Bundle<InProgress<Proven, Unsigned>, i64>>,
+) -> Transaction {
+    let Some(sapling_proven_bundle) = sapling_proven_bundle else {
+        return draft_tx;
+    };
+
+    // sighash for coinbase input has no hash type, no previous outputs, and no script code
+    let sighash = draft_tx
+        .sighash(
+            NetworkUpgrade::current(network, height),
+            HashType::NONE,
+            Vec::new().into(),
+            None,
+        )
+        .expect("draft coinbase should compute a sighash");
+
+    let authorized_bundle = sapling_proven_bundle
+        .apply_signatures(OsRng, sighash.0, &[])
+        .expect("authorization should succeed");
+
+    let draft_sapling_shielded_data = match &mut draft_tx {
+        Transaction::V1 { .. } | Transaction::V2 { .. } | Transaction::V3 { .. } => {
+            unreachable!("sapling binding signature is not supported for v1 to v3 transactions")
+        }
+
+        Transaction::V4 { .. } => {
+            unimplemented!("zebra has not implemented v4 shielded coinbase transactions")
+        }
+
+        Transaction::V5 {
+            sapling_shielded_data,
+            ..
+        } => sapling_shielded_data,
+
+        #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+        Transaction::V6 {
+            sapling_shielded_data,
+            ..
+        } => sapling_shielded_data,
+    }
+    .as_mut()
+    .expect("bundle indicates sapling shielded data is present");
+
+    draft_sapling_shielded_data.binding_sig = authorized_bundle.authorization().binding_sig;
+
+    draft_tx
 }

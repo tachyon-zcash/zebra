@@ -18,7 +18,6 @@ use tokio::sync::mpsc::{self, error::TrySendError};
 use tower::{Service, ServiceExt};
 use zcash_keys::address::Address;
 use zcash_protocol::PoolType;
-use zcash_script::script::Evaluable;
 
 use zebra_chain::{
     amount::{self, Amount, NegativeOrZero, NonNegative},
@@ -809,16 +808,39 @@ pub fn generate_coinbase_and_roots(
     >,
 ) -> Result<(TransactionTemplate<NegativeOrZero>, DefaultRoots), &'static str> {
     let miner_fee = calculate_miner_fee(mempool_txs);
-    let outputs = standard_coinbase_outputs(network, height, miner_address, miner_fee);
+    let (miner_reward, outputs) = coinbase_outputs(network, height, miner_fee);
     let current_nu = NetworkUpgrade::current(network, height);
 
     let tx = match current_nu {
-        NetworkUpgrade::Canopy => Transaction::new_v4_coinbase(height, outputs, miner_data),
+        NetworkUpgrade::Canopy => Transaction::new_v4_coinbase(
+            height,
+            outputs,
+            PoolType::Transparent,
+            miner_reward,
+            miner_address,
+            miner_data,
+        ),
         NetworkUpgrade::Nu5 | NetworkUpgrade::Nu6 | NetworkUpgrade::Nu6_1 => {
-            Transaction::new_v5_coinbase(network, height, outputs, miner_data)
+            Transaction::new_v5_coinbase(
+                network,
+                height,
+                outputs,
+                miner_reward,
+                PoolType::Transparent,
+                miner_address,
+                miner_data,
+            )
         }
         #[cfg(not(all(zcash_unstable = "nu7", feature = "tx_v6")))]
-        NetworkUpgrade::Nu7 => Transaction::new_v5_coinbase(network, height, outputs, miner_data),
+        NetworkUpgrade::Nu7 => Transaction::new_v5_coinbase(
+            network,
+            height,
+            outputs,
+            miner_reward,
+            PoolType::Transparent,
+            miner_address,
+            miner_data,
+        ),
         #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
         NetworkUpgrade::Nu7 => {
             Transaction::new_v6_coinbase(network, height, outputs, miner_data, zip233_amount)
@@ -858,12 +880,14 @@ pub fn calculate_miner_fee(mempool_txs: &[VerifiedUnminedTx]) -> Amount<NonNegat
 /// for `network`, `height` and `miner_fee`.
 ///
 /// Only works for post-Canopy heights.
-pub fn standard_coinbase_outputs(
+pub fn coinbase_outputs(
     network: &Network,
     height: Height,
-    miner_address: &Address,
     miner_fee: Amount<NonNegative>,
-) -> Vec<(Amount<NonNegative>, transparent::Script)> {
+) -> (
+    Amount<NonNegative>,
+    Vec<(Amount<NonNegative>, transparent::Script)>,
+) {
     let expected_block_subsidy = block_subsidy(height, network).expect("valid block subsidy");
     let funding_streams = funding_stream_values(height, network, expected_block_subsidy)
         .expect("funding stream value calculations are valid for reasonable chain heights");
@@ -903,24 +927,13 @@ pub fn standard_coinbase_outputs(
             .map(|(address, amount)| (*amount, address.script()))
             .collect();
 
-    let script = transparent::Script::new(
-        &miner_address
-            .to_transparent_address()
-            .expect("address must have a transparent component")
-            .script()
-            .to_bytes(),
-    );
-
     // The HashMap returns funding streams in an arbitrary order,
     // but Zebra's snapshot tests expect the same order every time.
 
     // zcashd sorts outputs in serialized data order, excluding the length field
     coinbase_outputs.sort_by_key(|(_amount, script)| script.clone());
 
-    // The miner reward is always the first output independent of the sort order
-    coinbase_outputs.insert(0, (miner_reward, script));
-
-    coinbase_outputs
+    (miner_reward, coinbase_outputs)
 }
 
 // - Transaction roots processing
