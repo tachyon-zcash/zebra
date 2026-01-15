@@ -838,8 +838,8 @@ pub fn generate_coinbase_and_roots(
         NetworkUpgrade::Canopy => Transaction::new_v4_coinbase(
             height,
             outputs,
-            miner_pool,
             miner_reward,
+            miner_pool,
             miner_address,
             miner_data.clone(),
         ),

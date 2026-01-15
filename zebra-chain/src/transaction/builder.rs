@@ -43,7 +43,7 @@ impl Transaction {
 
         // # Consensus
         //
-        // These consensus rules apply to v6 coinbase transactions:
+        // These consensus rules apply to v5 coinbase transactions after NU5 activation:
         //
         // > If effectiveVersion ≥ 5 then this condition MUST hold:
         // > tx_in_count > 0 or nSpendsSapling > 0 or
@@ -97,8 +97,8 @@ impl Transaction {
         );
 
         let tx = Transaction::V6 {
-            // > The transaction version number MUST be 4, 5, or 6. ...
-            // > If the transaction version number is 6 then the version group ID
+            // > The transaction version number MUST be 4 or 5. ...
+            // > If the transaction version number is 5 then the version group ID
             // > MUST be 0x26A7270A.
             // > If effectiveVersion ≥ 5, the nConsensusBranchId field MUST match the consensus
             // > branch ID used for SIGHASH transaction hashes, as specified in [ZIP-244].
@@ -112,13 +112,14 @@ impl Transaction {
             // > block height.
             expiry_height: height,
 
+            // > The NSM zip233_amount field [ZIP-233] must be set. It must be >= 0.
             zip233_amount: zip233_amount.unwrap_or(Amount::zero()),
 
             inputs,
             outputs,
 
-            // > In a version 6 coinbase transaction, the enableSpendsOrchard flag MUST be 0.
-            // > In a version 6 transaction, the reserved bits 2 .. 7 of the flagsOrchard field
+            // > In a version 5 coinbase transaction, the enableSpendsOrchard flag MUST be 0.
+            // > In a version 5 transaction, the reserved bits 2 .. 7 of the flagsOrchard field
             // > MUST be zero.
             //
             // See the Zcash spec for additional shielded coinbase consensus rules.
@@ -252,17 +253,14 @@ impl Transaction {
     pub fn new_v4_coinbase(
         height: Height,
         outputs: Vec<(Amount<NonNegative>, transparent::Script)>,
-        miner_pool: PoolType,
         miner_reward: Amount<NonNegative>,
+        miner_pool: PoolType,
         miner_address: &Address,
         miner_data: Vec<u8>,
     ) -> Transaction {
-        // V4 coinbase only supports transparent miner pool
-        assert_eq!(
-            miner_pool,
-            PoolType::Transparent,
-            "v4 coinbase only supports transparent miner pool"
-        );
+        if miner_pool != PoolType::Transparent {
+            unimplemented!("zebrad doesn't support shielded coinbase for V4 transactions");
+        }
 
         let (outputs, _, _) =
             build_coinbase_outputs(miner_pool, miner_address, miner_reward, outputs);
