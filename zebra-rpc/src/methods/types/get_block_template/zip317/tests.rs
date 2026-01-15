@@ -3,6 +3,7 @@
 #![allow(clippy::unwrap_in_result)]
 
 use zcash_keys::address::Address;
+use zcash_protocol::PoolType;
 use zcash_transparent::address::TransparentAddress;
 use zebra_chain::{block::Height, parameters::Network, transaction, transparent::OutPoint};
 use zebra_node_services::mempool::TransactionDependencies;
@@ -31,6 +32,7 @@ fn excludes_tx_with_unselected_dependencies() {
         select_mempool_transactions(
             &network,
             next_block_height,
+            PoolType::Transparent,
             &miner_address,
             vec![unmined_tx],
             mempool_tx_deps,
@@ -77,6 +79,7 @@ fn includes_tx_with_selected_dependencies() {
     let selected_txs = select_mempool_transactions(
         &network,
         next_block_height,
+        PoolType::Transparent,
         &miner_address,
         unmined_txs.clone(),
         mempool_tx_deps.clone(),
