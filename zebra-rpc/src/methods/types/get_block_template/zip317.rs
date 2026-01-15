@@ -14,33 +14,32 @@ use rand::{
 };
 
 use zcash_keys::address::Address;
+use zcash_protocol::{PoolType, ShieldedProtocol};
+use zcash_script::script::Evaluable;
 
-#[cfg(not(all(zcash_unstable = "nu7", feature = "tx_v6")))]
-use zcash_protocol::PoolType;
 use zebra_chain::{
-    amount::NegativeOrZero,
+    amount::{Amount, NegativeOrZero, NonNegative},
     block::{Height, MAX_BLOCK_BYTES},
-    parameters::Network,
+    parameters::{Network, NetworkUpgrade},
     transaction::{self, zip317::BLOCK_UNPAID_ACTION_LIMIT, Transaction, VerifiedUnminedTx},
+    transparent,
 };
+
 use zebra_consensus::MAX_BLOCK_SIGOPS;
 use zebra_node_services::mempool::TransactionDependencies;
 
+use super::coinbase_outputs;
+
 use crate::methods::types::transaction::TransactionTemplate;
 
-#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-use crate::methods::{Amount, NonNegative};
-
-#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-use zebra_chain::parameters::NetworkUpgrade;
+#[cfg(feature = "shielded-mining-sapling")]
+use zebra_chain::sapling;
 
 #[cfg(test)]
 mod tests;
 
 #[cfg(test)]
 use crate::methods::types::get_block_template::InBlockTxDependenciesDepth;
-
-use super::coinbase_outputs;
 
 /// Used in the return type of [`select_mempool_transactions()`] for test compilations.
 #[cfg(test)]
@@ -50,12 +49,10 @@ type SelectedMempoolTx = (InBlockTxDependenciesDepth, VerifiedUnminedTx);
 #[cfg(not(test))]
 type SelectedMempoolTx = VerifiedUnminedTx;
 
-/// Selects mempool transactions for block production according to [ZIP-317],
-/// using a fake coinbase transaction and the mempool.
+/// Selects mempool transactions for block production according to [ZIP-317].
 ///
-/// The fake coinbase transaction's serialized size and sigops must be at least as large
-/// as the real coinbase transaction. (The real coinbase transaction depends on the total
-/// fees from the transactions returned by this function.)
+/// Computes the coinbase overhead based on the mining parameters, then selects
+/// transactions that fit within the remaining block space.
 ///
 /// Returns selected transactions from `mempool_txs`.
 ///
@@ -64,6 +61,7 @@ type SelectedMempoolTx = VerifiedUnminedTx;
 pub fn select_mempool_transactions(
     network: &Network,
     next_block_height: Height,
+    miner_pool: PoolType,
     miner_address: &Address,
     mempool_txs: Vec<VerifiedUnminedTx>,
     mempool_tx_deps: TransactionDependencies,
@@ -72,16 +70,23 @@ pub fn select_mempool_transactions(
         Amount<NonNegative>,
     >,
 ) -> Vec<SelectedMempoolTx> {
-    // Use a fake coinbase transaction to break the dependency between transaction
-    // selection, the miner fee, and the fee payment in the coinbase transaction.
-    let fake_coinbase_tx = fake_coinbase_transaction(
-        network,
-        next_block_height,
-        miner_address,
-        extra_coinbase_data,
-        #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-        zip233_amount,
-    );
+    // Compute coinbase overhead based on mining parameters
+    let (overhead_bytes, overhead_sigops) = {
+        let coinbase_template = fake_coinbase_transaction(
+            network,
+            next_block_height,
+            miner_pool,
+            miner_address,
+            extra_coinbase_data,
+            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+            zip233_amount,
+        );
+
+        (
+            coinbase_template.data.as_ref().len(),
+            coinbase_template.sigops,
+        )
+    };
 
     let tx_dependencies = mempool_tx_deps.dependencies();
     let (independent_mempool_txs, mut dependent_mempool_txs): (HashMap<_, _>, HashMap<_, _>) =
@@ -102,9 +107,9 @@ pub fn select_mempool_transactions(
     let mut remaining_block_sigops = MAX_BLOCK_SIGOPS;
     let mut remaining_block_unpaid_actions: u32 = BLOCK_UNPAID_ACTION_LIMIT;
 
-    // Adjust the limits based on the coinbase transaction
-    remaining_block_bytes -= fake_coinbase_tx.data.as_ref().len();
-    remaining_block_sigops -= fake_coinbase_tx.sigops;
+    // Adjust the limits based on the coinbase transaction overhead
+    remaining_block_bytes -= overhead_bytes;
+    remaining_block_sigops -= overhead_sigops;
 
     // > Repeat while there is any candidate transaction
     // > that pays at least the conventional fee:
@@ -144,22 +149,23 @@ pub fn select_mempool_transactions(
     selected_txs
 }
 
-/// Returns a fake coinbase transaction that can be used during transaction selection.
-///
-/// This avoids a data dependency loop involving the selected transactions, the miner fee,
-/// and the coinbase transaction.
+/// Returns a fake coinbase transaction used to estimate available block space
+/// during selection of transactions from the mempool.
 ///
 /// This transaction's serialized size and sigops must be at least as large as the real coinbase
 /// transaction with the correct height and fee.
 pub fn fake_coinbase_transaction(
-    net: &Network,
+    network: &Network,
     height: Height,
+    miner_pool: PoolType,
     miner_address: &Address,
     extra_coinbase_data: Vec<u8>,
     #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))] zip233_amount: Option<
         Amount<NonNegative>,
     >,
 ) -> TransactionTemplate<NegativeOrZero> {
+    let current_nu = NetworkUpgrade::current(network, height);
+
     // Block heights are encoded as variable-length (script) and `u32` (lock time, expiry height).
     // They can also change the `u32` consensus branch id.
     // We use the template height here, which has the correct byte length.
@@ -169,33 +175,131 @@ pub fn fake_coinbase_transaction(
     // Transparent amounts are encoded as `i64`,
     // so one zat has the same size as the real amount:
     // https://developer.bitcoin.org/reference/transactions.html#txout-a-transaction-output
-    let miner_fee = 1.try_into().expect("amount is valid and non-negative");
-    let (miner_reward, outputs) = coinbase_outputs(net, height, miner_fee);
+    let dummy_miner_fee: Amount<NonNegative> = 1.try_into().expect("1 zatoshi is valid");
 
-    #[cfg(not(all(zcash_unstable = "nu7", feature = "tx_v6")))]
-    let coinbase = Transaction::new_v5_coinbase(
-        net,
-        height,
-        outputs,
-        miner_reward,
-        PoolType::Transparent,
-        miner_address,
-        extra_coinbase_data,
-    )
-    .into();
+    let (miner_reward, funding_outputs) = coinbase_outputs(network, height, dummy_miner_fee);
 
-    #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-    let coinbase = {
-        let network_upgrade = NetworkUpgrade::current(net, height);
-        if network_upgrade < NetworkUpgrade::Nu7 {
-            Transaction::new_v5_coinbase(net, height, outputs, extra_coinbase_data).into()
-        } else {
-            Transaction::new_v6_coinbase(net, height, outputs, extra_coinbase_data, zip233_amount)
-                .into()
+    // Build outputs based on miner pool type.
+    let (outputs, sapling_shielded_data) = match miner_pool {
+        PoolType::Transparent => {
+            let miner_script = transparent::Script::new(
+                &miner_address
+                    .to_transparent_address()
+                    .expect("miner_address must have transparent receiver")
+                    .script()
+                    .to_bytes(),
+            );
+            let mut outputs = funding_outputs;
+            outputs.insert(0, (miner_reward, miner_script));
+            (outputs, None)
         }
+
+        PoolType::Shielded(ShieldedProtocol::Sapling) => {
+            #[cfg(not(feature = "shielded-mining-sapling"))]
+            unreachable!("shielded-mining-sapling feature must be enabled");
+
+            #[cfg(feature = "shielded-mining-sapling")]
+            {
+                let sapling_anchor = sapling::coinbase::dummy_shielded_coinbase(miner_reward);
+                (funding_outputs, Some(sapling_anchor))
+            }
+        }
+
+        PoolType::Shielded(ShieldedProtocol::Orchard) => unimplemented!(),
     };
 
-    TransactionTemplate::from_coinbase(&coinbase, miner_fee)
+    let outputs = outputs
+        .into_iter()
+        .map(|(amount, script)| transparent::Output::new_coinbase(amount, script))
+        .collect();
+
+    // Build transaction with the appropriate version.
+    let dummy_tx = match current_nu {
+        // Pre-Canopy: not supported
+        NetworkUpgrade::Genesis
+        | NetworkUpgrade::BeforeOverwinter
+        | NetworkUpgrade::Overwinter
+        | NetworkUpgrade::Sapling
+        | NetworkUpgrade::Blossom
+        | NetworkUpgrade::Heartwood => {
+            unimplemented!("zebra does not support pre-Canopy coinbase transactions")
+        }
+
+        // Canopy: V4 transaction, transparent only
+        NetworkUpgrade::Canopy => {
+            if sapling_shielded_data.is_some() {
+                unimplemented!("zebra does not support shielded coinbase for V4 transactions");
+            }
+
+            Transaction::V4 {
+                lock_time: transaction::LockTime::unlocked(),
+                expiry_height: height,
+                inputs: vec![transparent::Input::new_coinbase(
+                    height,
+                    extra_coinbase_data,
+                    Some(u32::MAX),
+                )],
+                outputs,
+                joinsplit_data: None,
+                sapling_shielded_data: None,
+            }
+        }
+
+        // Nu5/Nu6/Nu6_1: V5 transaction
+        NetworkUpgrade::Nu5 | NetworkUpgrade::Nu6 | NetworkUpgrade::Nu6_1 => Transaction::V5 {
+            network_upgrade: current_nu,
+            lock_time: transaction::LockTime::unlocked(),
+            expiry_height: height,
+            inputs: vec![transparent::Input::new_coinbase(
+                height,
+                extra_coinbase_data,
+                None,
+            )],
+            outputs,
+            sapling_shielded_data,
+            orchard_shielded_data: None,
+        },
+
+        #[cfg(not(zcash_unstable = "nu7"))]
+        NetworkUpgrade::Nu7 => unreachable!("nu7 is not enabled"),
+
+        // Nu7: V5 or V6 depending on feature flags
+        #[cfg(all(zcash_unstable = "nu7", not(feature = "tx_v6")))]
+        NetworkUpgrade::Nu7 => Transaction::V5 {
+            network_upgrade: current_nu,
+            lock_time: transaction::LockTime::unlocked(),
+            expiry_height: height,
+            inputs: vec![transparent::Input::new_coinbase(
+                height,
+                extra_coinbase_data,
+                None,
+            )],
+            outputs,
+            sapling_shielded_data,
+            orchard_shielded_data: None,
+        },
+
+        #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+        NetworkUpgrade::Nu7 => Transaction::V6 {
+            network_upgrade: current_nu,
+            lock_time: transaction::LockTime::unlocked(),
+            expiry_height: height,
+            zip233_amount: zip233_amount.unwrap_or(Amount::zero()),
+            inputs: vec![transparent::Input::new_coinbase(
+                height,
+                extra_coinbase_data,
+                None,
+            )],
+            outputs,
+            sapling_shielded_data,
+            orchard_shielded_data: None,
+        },
+
+        #[cfg(zcash_unstable = "zfuture")]
+        NetworkUpgrade::ZFuture => unimplemented!(),
+    };
+
+    TransactionTemplate::from_coinbase(&dummy_tx.into(), dummy_miner_fee)
 }
 
 /// Returns a fee-weighted index and the total weight of `transactions`.

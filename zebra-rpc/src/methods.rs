@@ -2421,6 +2421,7 @@ where
         let mempool_txs = select_mempool_transactions(
             &network,
             next_block_height,
+            miner_pool,
             &miner_address,
             mempool_txs,
             mempool_tx_deps,
