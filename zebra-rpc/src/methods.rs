@@ -2137,6 +2137,7 @@ where
         // Clone Configs
         let network = self.network.clone();
         let extra_coinbase_data = self.gbt.extra_coinbase_data();
+        let miner_pool = self.gbt.miner_pool();
 
         // Clone Services
         let mempool = self.mempool.clone();
@@ -2440,6 +2441,7 @@ where
 
         let response = BlockTemplateResponse::new_internal(
             &network,
+            miner_pool,
             &miner_address,
             &chain_tip_and_local_time,
             server_long_poll_id,

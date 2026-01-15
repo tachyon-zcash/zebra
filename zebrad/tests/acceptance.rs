@@ -156,6 +156,7 @@ use tower::ServiceExt;
 
 use zcash_keys::address::Address;
 
+use zcash_protocol::PoolType;
 use zebra_chain::{
     block::{self, genesis::regtest_genesis_block, ChainHistoryBlockTxAuthCommitmentHash, Height},
     parameters::{
@@ -3536,6 +3537,7 @@ async fn nu6_funding_streams_and_coinbase_balance() -> Result<()> {
     let (coinbase_txn, default_roots) = generate_coinbase_and_roots(
         &network,
         Height(block_template.height()),
+        PoolType::Transparent,
         &miner_address,
         &[],
         chain_history_root,
@@ -3597,6 +3599,7 @@ async fn nu6_funding_streams_and_coinbase_balance() -> Result<()> {
     let (coinbase_txn, default_roots) = generate_coinbase_and_roots(
         &network,
         Height(block_template.height()),
+        PoolType::Transparent,
         &miner_address,
         &[],
         chain_history_root,

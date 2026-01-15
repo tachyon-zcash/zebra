@@ -132,11 +132,11 @@ pub struct BlockTemplateResponse {
     pub(crate) default_roots: DefaultRoots,
 
     /// The non-coinbase transactions selected for this block template.
-    pub(crate) transactions: Vec<TransactionTemplate<amount::NonNegative>>,
+    pub(crate) transactions: Vec<TransactionTemplate<NonNegative>>,
 
     /// The coinbase transaction generated from `transactions` and `height`.
     #[serde(rename = "coinbasetxn")]
-    pub(crate) coinbase_txn: TransactionTemplate<amount::NegativeOrZero>,
+    pub(crate) coinbase_txn: TransactionTemplate<NegativeOrZero>,
 
     /// An ID that represents the chain tip and mempool contents for this template.
     #[serde(rename = "longpollid")]
@@ -272,6 +272,7 @@ impl BlockTemplateResponse {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_internal(
         network: &Network,
+        miner_pool: PoolType,
         miner_address: &Address,
         chain_tip_and_local_time: &GetBlockTemplateChainInfo,
         long_poll_id: LongPollId,
@@ -303,7 +304,7 @@ impl BlockTemplateResponse {
         let (mempool_tx_templates, mempool_txs): (Vec<_>, Vec<_>) = {
             let mut mempool_txs_with_templates: Vec<(
                 InBlockTxDependenciesDepth,
-                TransactionTemplate<amount::NonNegative>,
+                TransactionTemplate<NonNegative>,
                 VerifiedUnminedTx,
             )> = mempool_txs
                 .into_iter()
@@ -329,6 +330,7 @@ impl BlockTemplateResponse {
         let (coinbase_txn, default_roots) = generate_coinbase_and_roots(
             network,
             next_block_height,
+            miner_pool,
             miner_address,
             &mempool_txs,
             chain_tip_and_local_time.chain_history_root,
@@ -437,6 +439,9 @@ where
     /// Address for receiving miner subsidy and tx fees.
     miner_address: Option<Address>,
 
+    /// The pool to use for mining rewards.
+    miner_pool: PoolType,
+
     /// Extra data to include in coinbase transaction inputs.
     /// Limited to around 95 bytes by the consensus rules.
     extra_coinbase_data: Vec<u8>,
@@ -449,7 +454,7 @@ where
 
     /// A channel to send successful block submissions to the block gossip task,
     /// so they can be advertised to peers.
-    mined_block_sender: mpsc::Sender<(block::Hash, block::Height)>,
+    mined_block_sender: mpsc::Sender<(block::Hash, Height)>,
 }
 
 // A limit on the configured extra coinbase data, regardless of the current block height.
@@ -465,23 +470,23 @@ where
     ///
     /// # Panics
     ///
-    /// - If the `miner_address` in `conf` is not valid.
+    /// - If `miner_address` doesn't support the configured `miner_pool`.
     pub fn new(
         net: &Network,
         conf: config::mining::Config,
         block_verifier_router: BlockVerifierRouter,
         sync_status: SyncStatus,
-        mined_block_sender: Option<mpsc::Sender<(block::Hash, block::Height)>>,
+        mined_block_sender: Option<mpsc::Sender<(block::Hash, Height)>>,
     ) -> Self {
-        // Check that the configured miner address is valid.
+        let miner_pool = conf.miner_pool.unwrap_or(PoolType::Transparent);
+
         let miner_address = conf.miner_address.map(|addr| {
-            if addr.can_receive_as(PoolType::Transparent) {
-                Address::try_from_zcash_address(net, addr)
-                    .expect("miner_address must be a valid Zcash address")
-            } else {
-                // TODO: Remove this panic once we support mining to shielded addresses.
-                panic!("miner_address can't receive transparent funds")
-            }
+            assert!(
+                addr.can_receive_as(miner_pool),
+                "miner_address can't receive {miner_pool:?} rewards",
+            );
+            Address::try_from_zcash_address(net, addr)
+                .expect("miner_address must be a valid Zcash address")
         });
 
         // Hex-decode to bytes if possible, otherwise UTF-8 encode to bytes.
@@ -501,6 +506,7 @@ where
 
         Self {
             miner_address,
+            miner_pool,
             extra_coinbase_data,
             block_verifier_router,
             sync_status,
@@ -512,6 +518,10 @@ where
     /// Returns a valid miner address, if any.
     pub fn miner_address(&self) -> Option<Address> {
         self.miner_address.clone()
+    }
+
+    pub fn miner_pool(&self) -> PoolType {
+        self.miner_pool
     }
 
     /// Returns the extra coinbase data.
@@ -548,8 +558,8 @@ where
     pub fn advertise_mined_block(
         &self,
         block: block::Hash,
-        height: block::Height,
-    ) -> Result<(), TrySendError<(block::Hash, block::Height)>> {
+        height: Height,
+    ) -> Result<(), TrySendError<(block::Hash, Height)>> {
         self.mined_block_sender.try_send((block, height))
     }
 }
@@ -564,6 +574,7 @@ where
         // Skip fields without debug impls
         f.debug_struct("GetBlockTemplateRpcImpl")
             .field("miner_address", &self.miner_address)
+            .field("miner_pool", &self.miner_pool)
             .field("extra_coinbase_data", &self.extra_coinbase_data)
             .finish()
     }
@@ -799,6 +810,7 @@ where
 pub fn generate_coinbase_and_roots(
     network: &Network,
     height: Height,
+    miner_pool: PoolType,
     miner_address: &Address,
     mempool_txs: &[VerifiedUnminedTx],
     chain_history_root: Option<ChainHistoryMmrRootHash>,
@@ -808,44 +820,72 @@ pub fn generate_coinbase_and_roots(
     >,
 ) -> Result<(TransactionTemplate<NegativeOrZero>, DefaultRoots), &'static str> {
     let miner_fee = calculate_miner_fee(mempool_txs);
-    let (miner_reward, outputs) = coinbase_outputs(network, height, miner_fee);
     let current_nu = NetworkUpgrade::current(network, height);
+    let (miner_reward, outputs) = coinbase_outputs(network, height, miner_fee);
 
-    let tx = match current_nu {
+    let tx: UnminedTx = match current_nu {
+        // Pre-Canopy: not supported
+        NetworkUpgrade::Genesis
+        | NetworkUpgrade::BeforeOverwinter
+        | NetworkUpgrade::Overwinter
+        | NetworkUpgrade::Sapling
+        | NetworkUpgrade::Blossom
+        | NetworkUpgrade::Heartwood => {
+            unimplemented!("zebra does not support pre-Canopy coinbase transactions")
+        }
+
+        // Canopy: V4 transaction, transparent only
         NetworkUpgrade::Canopy => Transaction::new_v4_coinbase(
             height,
             outputs,
-            PoolType::Transparent,
+            miner_pool,
             miner_reward,
             miner_address,
-            miner_data,
+            miner_data.clone(),
         ),
+
+        // Nu5/Nu6/Nu6_1: V5 transaction
         NetworkUpgrade::Nu5 | NetworkUpgrade::Nu6 | NetworkUpgrade::Nu6_1 => {
             Transaction::new_v5_coinbase(
                 network,
                 height,
                 outputs,
                 miner_reward,
-                PoolType::Transparent,
+                miner_pool,
                 miner_address,
-                miner_data,
+                miner_data.clone(),
             )
         }
-        #[cfg(not(all(zcash_unstable = "nu7", feature = "tx_v6")))]
+
+        #[cfg(not(zcash_unstable = "nu7"))]
+        NetworkUpgrade::Nu7 => unreachable!("nu7 is not enabled"),
+
+        // Nu7: V5 or V6 depending on feature flags
+        #[cfg(all(zcash_unstable = "nu7", not(feature = "tx_v6")))]
         NetworkUpgrade::Nu7 => Transaction::new_v5_coinbase(
             network,
             height,
             outputs,
             miner_reward,
-            PoolType::Transparent,
+            miner_pool,
             miner_address,
-            miner_data,
+            miner_data.clone(),
         ),
+
         #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-        NetworkUpgrade::Nu7 => {
-            Transaction::new_v6_coinbase(network, height, outputs, miner_data, zip233_amount)
-        }
-        _ => Err("Zebra does not support generating pre-Canopy coinbase transactions")?,
+        NetworkUpgrade::Nu7 => Transaction::new_v6_coinbase(
+            network,
+            height,
+            outputs,
+            miner_reward,
+            miner_pool,
+            miner_address,
+            miner_data.clone(),
+            zip233_amount,
+        ),
+
+        #[cfg(zcash_unstable = "zfuture")]
+        NetworkUpgrade::ZFuture => unimplemented!(),
     }
     .into();
 
@@ -876,8 +916,7 @@ pub fn calculate_miner_fee(mempool_txs: &[VerifiedUnminedTx]) -> Amount<NonNegat
     )
 }
 
-/// Returns the standard funding stream and miner reward transparent output scripts
-/// for `network`, `height` and `miner_fee`.
+/// Returns the miner reward and funding stream outputs for a coinbase transaction.
 ///
 /// Only works for post-Canopy heights.
 pub fn coinbase_outputs(
@@ -919,21 +958,19 @@ pub fn coinbase_outputs(
         .collect();
     let one_time_lockbox_disbursements = network.lockbox_disbursements(height);
 
-    // Combine the miner reward and funding streams into a list of coinbase amounts and addresses.
-    let mut coinbase_outputs: Vec<(Amount<NonNegative>, transparent::Script)> =
-        funding_streams_outputs
-            .iter()
-            .chain(&one_time_lockbox_disbursements)
-            .map(|(address, amount)| (*amount, address.script()))
-            .collect();
+    // Combine funding streams and lockbox disbursements
+    let mut outputs: Vec<(Amount<NonNegative>, transparent::Script)> = funding_streams_outputs
+        .iter()
+        .chain(&one_time_lockbox_disbursements)
+        .map(|(address, amount)| (*amount, address.script()))
+        .collect();
 
     // The HashMap returns funding streams in an arbitrary order,
     // but Zebra's snapshot tests expect the same order every time.
-
     // zcashd sorts outputs in serialized data order, excluding the length field
-    coinbase_outputs.sort_by_key(|(_amount, script)| script.clone());
+    outputs.sort_by_key(|(_amount, script)| script.clone());
 
-    (miner_reward, coinbase_outputs)
+    (miner_reward, outputs)
 }
 
 // - Transaction roots processing

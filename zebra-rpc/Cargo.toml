@@ -31,6 +31,9 @@ tx_v6 = ["zebra-chain/tx_v6", "zebra-state/tx_v6", "zebra-consensus/tx_v6"]
 # Experimental internal miner support
 internal-miner = []
 
+# Shielded coinbase mining (ZIP 213)
+shielded-mining-sapling = ["zebra-chain/shielded-mining-sapling", "zcash_keys/sapling", "zcash_proofs/bundled-prover"]
+
 # Test-only features
 proptest-impl = [
     "proptest",
@@ -91,6 +94,9 @@ zcash_transparent = { workspace = true }
 
 sapling-crypto = { workspace = true }
 
+# Shielded coinbase provers (optional, activated by shielded-mining features)
+zcash_proofs = { workspace = true, optional = true }
+
 # Test-only feature proptest-impl
 proptest = { workspace = true, optional = true }
 
@@ -131,6 +137,8 @@ zebra-state = { path = "../zebra-state", version = "3.1.1", features = [
 ] }
 
 zebra-test = { path = "../zebra-test", version = "2.0.1" }
+
+zcash_proofs = { workspace = true }
 
 [lints]
 workspace = true

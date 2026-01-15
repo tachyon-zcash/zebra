@@ -72,6 +72,12 @@ internal-miner = [
     "zebra-rpc/internal-miner",
 ]
 
+# Shielded coinbase mining (ZIP 213) - for external or internal miners
+shielded-mining-sapling = ["zebra-rpc/shielded-mining-sapling"]
+
+# Convenience features combining internal miner + shielded mining
+internal-miner-sapling = ["internal-miner", "shielded-mining-sapling"]
+
 # Experimental elasticsearch indexing
 elasticsearch = [
     "zebra-state/elasticsearch",
@@ -272,7 +278,9 @@ tracing-test = { workspace = true, features = ["no-env-filter"] }
 tokio = { workspace = true, features = ["full", "tracing", "test-util"] }
 tokio-stream = { workspace = true }
 
+sapling-crypto = { workspace = true }
 zcash_keys = { workspace = true }
+zcash_protocol = { workspace = true }
 
 # test feature lightwalletd-grpc-tests
 prost = { workspace = true }

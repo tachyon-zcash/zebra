@@ -3,7 +3,6 @@
 #![allow(clippy::unwrap_in_result)]
 
 use zcash_keys::address::Address;
-
 use zcash_transparent::address::TransparentAddress;
 use zebra_chain::{block::Height, parameters::Network, transaction, transparent::OutPoint};
 use zebra_node_services::mempool::TransactionDependencies;
@@ -13,7 +12,7 @@ use super::select_mempool_transactions;
 #[test]
 fn excludes_tx_with_unselected_dependencies() {
     let network = Network::Mainnet;
-    let next_block_height = Height(1_000_000);
+    let next_block_height = Height(1_100_000);
     let extra_coinbase_data = Vec::new();
     let mut mempool_tx_deps = TransactionDependencies::default();
     let miner_address = Address::from(TransparentAddress::PublicKeyHash([0x7e; 20]));
@@ -47,7 +46,7 @@ fn excludes_tx_with_unselected_dependencies() {
 #[test]
 fn includes_tx_with_selected_dependencies() {
     let network = Network::Mainnet;
-    let next_block_height = Height(1_000_000);
+    let next_block_height = Height(1_100_000);
     let unmined_txs: Vec<_> = network.unmined_transactions_in_blocks(..).take(3).collect();
     let miner_address = Address::from(TransparentAddress::PublicKeyHash([0x7e; 20]));
 

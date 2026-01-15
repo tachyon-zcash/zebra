@@ -2063,6 +2063,7 @@ async fn gbt_with(net: Network, addr: ZcashAddress) {
     mock_sync_status.set_is_close_to_tip(true);
 
     let mining_conf = crate::config::mining::Config {
+        miner_pool: None,
         miner_address: Some(addr.clone()),
         extra_coinbase_data: None,
         internal_miner: true,
@@ -2755,6 +2756,7 @@ async fn rpc_getdifficulty() {
 
     #[allow(clippy::unnecessary_struct_initialization)]
     let mining_conf = mining::Config {
+        miner_pool: None,
         miner_address: None,
         extra_coinbase_data: None,
         internal_miner: true,
