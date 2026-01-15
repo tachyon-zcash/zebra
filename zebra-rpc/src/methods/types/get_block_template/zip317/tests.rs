@@ -4,6 +4,7 @@
 
 use zcash_keys::address::Address;
 use zcash_protocol::PoolType;
+
 use zcash_transparent::address::TransparentAddress;
 use zebra_chain::{block::Height, parameters::Network, transaction, transparent::OutPoint};
 use zebra_node_services::mempool::TransactionDependencies;

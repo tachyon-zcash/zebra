@@ -132,11 +132,11 @@ pub struct BlockTemplateResponse {
     pub(crate) default_roots: DefaultRoots,
 
     /// The non-coinbase transactions selected for this block template.
-    pub(crate) transactions: Vec<TransactionTemplate<NonNegative>>,
+    pub(crate) transactions: Vec<TransactionTemplate<amount::NonNegative>>,
 
     /// The coinbase transaction generated from `transactions` and `height`.
     #[serde(rename = "coinbasetxn")]
-    pub(crate) coinbase_txn: TransactionTemplate<NegativeOrZero>,
+    pub(crate) coinbase_txn: TransactionTemplate<amount::NegativeOrZero>,
 
     /// An ID that represents the chain tip and mempool contents for this template.
     #[serde(rename = "longpollid")]
@@ -304,7 +304,7 @@ impl BlockTemplateResponse {
         let (mempool_tx_templates, mempool_txs): (Vec<_>, Vec<_>) = {
             let mut mempool_txs_with_templates: Vec<(
                 InBlockTxDependenciesDepth,
-                TransactionTemplate<NonNegative>,
+                TransactionTemplate<amount::NonNegative>,
                 VerifiedUnminedTx,
             )> = mempool_txs
                 .into_iter()
@@ -454,7 +454,7 @@ where
 
     /// A channel to send successful block submissions to the block gossip task,
     /// so they can be advertised to peers.
-    mined_block_sender: mpsc::Sender<(block::Hash, Height)>,
+    mined_block_sender: mpsc::Sender<(block::Hash, block::Height)>,
 }
 
 // A limit on the configured extra coinbase data, regardless of the current block height.
@@ -476,7 +476,7 @@ where
         conf: config::mining::Config,
         block_verifier_router: BlockVerifierRouter,
         sync_status: SyncStatus,
-        mined_block_sender: Option<mpsc::Sender<(block::Hash, Height)>>,
+        mined_block_sender: Option<mpsc::Sender<(block::Hash, block::Height)>>,
     ) -> Self {
         let miner_pool = conf.miner_pool.unwrap_or(PoolType::Transparent);
 
@@ -558,8 +558,8 @@ where
     pub fn advertise_mined_block(
         &self,
         block: block::Hash,
-        height: Height,
-    ) -> Result<(), TrySendError<(block::Hash, Height)>> {
+        height: block::Height,
+    ) -> Result<(), TrySendError<(block::Hash, block::Height)>> {
         self.mined_block_sender.try_send((block, height))
     }
 }
