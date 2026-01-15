@@ -205,7 +205,9 @@ pub fn fake_coinbase_transaction(
             }
         }
 
-        PoolType::Shielded(ShieldedProtocol::Orchard) => unimplemented!(),
+        PoolType::Shielded(ShieldedProtocol::Orchard) => {
+            unimplemented!("zebrad doesn't support Orchard shielded coinbase")
+        }
     };
 
     let outputs = outputs
@@ -222,13 +224,13 @@ pub fn fake_coinbase_transaction(
         | NetworkUpgrade::Sapling
         | NetworkUpgrade::Blossom
         | NetworkUpgrade::Heartwood => {
-            unimplemented!("zebra does not support pre-Canopy coinbase transactions")
+            unimplemented!("zebrad doesn't support pre-Canopy coinbase")
         }
 
         // Canopy: V4 transaction, transparent only
         NetworkUpgrade::Canopy => {
             if sapling_shielded_data.is_some() {
-                unimplemented!("zebra does not support shielded coinbase for V4 transactions");
+                unimplemented!("zebrad doesn't support shielded coinbase for V4 transactions");
             }
 
             Transaction::V4 {

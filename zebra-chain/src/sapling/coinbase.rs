@@ -10,8 +10,15 @@
 //! This handles proof generation and binding signature internally.
 //!
 //! For size estimation (used in transaction selection), use
-//! [`Transaction::estimate_v5_coinbase`] which uses [`dummy_sapling_shielded_data`]
-//! to create placeholder data of the correct size.
+//! [`dummy_shielded_coinbase`] to create placeholder data of the correct size.
+//!
+//! # Design
+//!
+//! This module uses `sapling_crypto::builder::bundle` directly rather than
+//! `zcash_primitives::transaction::builder::Builder` because:
+//! - `sapling_crypto` provides `BundleType::Coinbase` for coinbase-specific rules
+//! - It exposes the two-phase signing API needed for sighash computation
+//! - It allows custom OVK (required for ZIP 213 all-zeros OVK)
 //!
 //! # Internals
 //!
@@ -21,7 +28,7 @@
 //!
 //! Per ZIP 244, the sighash computation includes the Sapling outputs but NOT
 //! the binding signature. This allows the builder to:
-//! 1. Create outputs and proofs via [`prove_sapling_coinbase`]
+//! 1. Create outputs and proofs via [`prove`]
 //! 2. Build a draft transaction with placeholder binding_sig
 //! 3. Compute sighash on the draft
 //! 4. Finalize with the real binding signature
@@ -140,7 +147,7 @@ where
 ///
 /// Returns the shielded data (with placeholder binding signature) and the proven
 /// bundle needed to compute the real binding signature later.
-pub fn build_shielded_coinbase(
+pub(crate) fn build_shielded_coinbase(
     miner_address: PaymentAddress,
     miner_reward: Amount<NonNegative>,
 ) -> (

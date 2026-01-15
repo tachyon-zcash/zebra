@@ -13,6 +13,7 @@ use super::select_mempool_transactions;
 #[test]
 fn excludes_tx_with_unselected_dependencies() {
     let network = Network::Mainnet;
+    // Height must be post-Canopy (1,046,400 on Mainnet) for coinbase generation
     let next_block_height = Height(1_100_000);
     let extra_coinbase_data = Vec::new();
     let mut mempool_tx_deps = TransactionDependencies::default();
@@ -48,6 +49,7 @@ fn excludes_tx_with_unselected_dependencies() {
 #[test]
 fn includes_tx_with_selected_dependencies() {
     let network = Network::Mainnet;
+    // Height must be post-Canopy (1,046,400 on Mainnet) for coinbase generation
     let next_block_height = Height(1_100_000);
     let unmined_txs: Vec<_> = network.unmined_transactions_in_blocks(..).take(3).collect();
     let miner_address = Address::from(TransparentAddress::PublicKeyHash([0x7e; 20]));

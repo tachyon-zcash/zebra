@@ -90,10 +90,8 @@ impl Transaction {
             outputs.len()
                 + sapling_shielded_data
                     .as_ref()
-                    .map_or(0, |data| data.outputs().count())
-                + orchard_shielded_data
-                    .as_ref()
-                    .map_or(0, |_| unimplemented!() as usize),
+                    .map_or(0, |data| data.outputs().count()),
+            // + orchard_shielded_data
             0,
             "invalid coinbase transaction: must have at least one output"
         );
@@ -204,10 +202,8 @@ impl Transaction {
             outputs.len()
                 + sapling_shielded_data
                     .as_ref()
-                    .map_or(0, |data| data.outputs().count())
-                + orchard_shielded_data
-                    .as_ref()
-                    .map_or(0, |_| unimplemented!() as usize),
+                    .map_or(0, |data| data.outputs().count()),
+            // orchard_shielded_data
             0,
             "invalid coinbase transaction: must have at least one output"
         );
@@ -351,7 +347,7 @@ fn build_coinbase_outputs(
             unreachable!("shielded mining feature must be enabled")
         }
         PoolType::Shielded(ShieldedProtocol::Orchard) => {
-            unimplemented!("Orchard shielded coinbase not yet implemented")
+            unimplemented!("zebrad doesn't support Orchard shielded coinbase")
         }
     };
 
@@ -395,7 +391,7 @@ fn update_coinbase_binding_sig(
         }
 
         Transaction::V4 { .. } => {
-            unimplemented!("zebra has not implemented v4 shielded coinbase transactions")
+            unimplemented!("zebrad doesn't support shielded coinbase for V4 transactions")
         }
 
         Transaction::V5 {

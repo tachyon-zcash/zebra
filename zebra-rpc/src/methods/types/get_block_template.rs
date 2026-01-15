@@ -831,7 +831,7 @@ pub fn generate_coinbase_and_roots(
         | NetworkUpgrade::Sapling
         | NetworkUpgrade::Blossom
         | NetworkUpgrade::Heartwood => {
-            unimplemented!("zebra does not support pre-Canopy coinbase transactions")
+            unimplemented!("zebrad doesn't support pre-Canopy coinbase")
         }
 
         // Canopy: V4 transaction, transparent only
