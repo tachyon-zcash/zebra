@@ -133,6 +133,7 @@ rand = { workspace = true, optional = true }
 rand_chacha = { workspace = true, optional = true }
 
 zebra-test = { path = "../zebra-test/", version = "2.0.1", optional = true }
+zcash_tachyon = { git = "http://github.com/tachyon-zcash/tachyon", rev = "38ca55b", version = "0.0.0" }
 
 [dev-dependencies]
 # Benchmarks
