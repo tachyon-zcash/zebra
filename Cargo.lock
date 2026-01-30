@@ -6721,6 +6721,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "zcash_tachyon"
+version = "0.0.0"
+source = "git+http://github.com/tachyon-zcash/tachyon?rev=1ff9b78#1ff9b7823c2c996bec4bd47a12d9c3fce4a9ae57"
+dependencies = [
+ "bitvec",
+ "blake2b_simd",
+ "ff",
+ "group",
+ "pasta_curves",
+ "proptest",
+ "rand 0.8.5",
+ "reddsa",
+]
+
+[[package]]
 name = "zcash_transparent"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6808,6 +6823,7 @@ dependencies = [
  "zcash_primitives",
  "zcash_protocol",
  "zcash_script",
+ "zcash_tachyon",
  "zcash_transparent",
  "zebra-test",
 ]
