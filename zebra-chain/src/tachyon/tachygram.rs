@@ -1,7 +1,11 @@
 //! Tachygram: A unified field element for nullifiers and note commitments.
 //!
-//! Tachygrams form the basis of the Tachyon polynomial accumulator, enabling a single
-//! structure for both nullifiers and note commitments.
+//! **Tachygrams** are 32-byte blobs that represent either nullifiers or note
+//! commitments. The consensus protocol does not distinguish between them—they
+//! are treated identically and inserted in a single polynomial accumulator.
+//!
+//! This unification simplifies the protocol and enables efficient
+//! membership/non-membership proofs.
 
 use std::{
     fmt,
@@ -15,10 +19,16 @@ use crate::serialization::serde_helpers;
 
 use super::commitment::NoteCommitment;
 
-/// A unified field element that can be either a nullifier or note commitment.
+/// A 32-byte blob representing either a nullifier or note commitment.
 ///
-/// Tachygrams are roots of the polynomial in the Tachyon accumulator. Both nullifiers
-/// and note commitments are field elements, enabling efficient set (non-)membership proofs.
+/// Tachygrams are roots of the polynomial in the Tachyon accumulator.
+/// The accumulator does not distinguish between commitments and nullifiers;
+/// both are treated as field elements. This unified approach simplifies
+/// the proof system and enables efficient batch operations.
+///
+/// Each tachyaction produces exactly one tachygram, and it is intentionally
+/// indistinguishable whether that tachygram represents a nullifier or
+/// commitment—this provides additional privacy.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tachygram(#[serde(with = "serde_helpers::Base")] pub pallas::Base);
 
