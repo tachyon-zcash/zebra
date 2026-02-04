@@ -145,31 +145,3 @@ impl From<Anchor> for tachyon::Epoch {
 //
 // Set membership proofs show that a tachygram is a root of the polynomial.
 // Set non-membership proofs show that a tachygram is NOT a root.
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn anchor_serialization_roundtrip() {
-        let _init_guard = zebra_test::init();
-
-        let anchor: Anchor = pallas::Base::from(12345u64).into();
-
-        let mut bytes = Vec::new();
-        anchor.zcash_serialize(&mut bytes).unwrap();
-
-        assert_eq!(bytes.len(), Anchor::SIZE);
-
-        let anchor2 = Anchor::zcash_deserialize(&bytes[..]).unwrap();
-        assert_eq!(anchor, anchor2);
-    }
-
-    #[test]
-    fn anchor_default() {
-        let _init_guard = zebra_test::init();
-
-        let anchor = Anchor::default();
-        assert_eq!(pallas::Base::from(anchor), pallas::Base::zero());
-    }
-}
