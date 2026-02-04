@@ -583,8 +583,8 @@ impl ZcashDeserialize for Option<tachyon::ShieldedData> {
 
             // proof (size-prefixed)
             let proof_bytes: Vec<u8> = (&mut reader).zcash_deserialize_into()?;
-            let proof = tachyon::AggregateProof::new(proof_bytes)
-                .map_err(|_| SerializationError::Parse("Aggregate proof too large"))?;
+            let proof = tachyon::Proof::new(proof_bytes)
+                .map_err(|_| SerializationError::Parse("Proof too large"))?;
 
             // anchor
             let anchor_bytes: [u8; 32] = reader.read_32_bytes()?;

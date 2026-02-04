@@ -4,11 +4,12 @@
 //! validity within the polynomial accumulator system:
 //!
 //! - **Tachygrams**: Nullifiers and note commitments as polynomial roots
-//! - **Proof**: The Ragu proof covering all operations (placeholder)
+//! - **Proof**: The Ragu proof covering all operations
 //! - **Epoch**: The accumulator state anchor
 
 use crate::Tachygram;
 use crate::note::Epoch;
+use crate::proof::Proof;
 
 /// Tachystamp containing the proof, tachygrams, and epoch.
 ///
@@ -32,7 +33,7 @@ pub struct Tachystamp {
     tachygrams: Vec<Tachygram>,
 
     /// The Ragu proof covering all operations.
-    proof: (),
+    proof: Proof,
 
     /// The epoch (recent accumulator state).
     ///
@@ -43,7 +44,7 @@ pub struct Tachystamp {
 
 impl Tachystamp {
     /// Creates a new tachystamp.
-    pub fn new(tachygrams: Vec<Tachygram>, proof: (), anchor: Epoch) -> Self {
+    pub fn new(tachygrams: Vec<Tachygram>, proof: Proof, anchor: Epoch) -> Self {
         Self {
             tachygrams,
             proof,
@@ -57,7 +58,7 @@ impl Tachystamp {
     }
 
     /// Returns the proof.
-    pub fn proof(&self) -> &() {
+    pub fn proof(&self) -> &Proof {
         &self.proof
     }
 

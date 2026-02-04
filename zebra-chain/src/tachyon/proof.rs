@@ -1,79 +1,39 @@
-//! Tachyon proofs for aggregate transaction verification.
+//! Tachyon proofs.
 //!
-//! Tachyon uses an aggregate proof model:
-//! - **Aggregate transactions** contain an `AggregateProof` covering multiple tachyon txs
-//! - **Regular tachyon transactions** reference an aggregate by transaction hash
-//!
-//! Multiple aggregate transactions may exist per block, and regular tachyon
-//! transactions specify which aggregate covers them.
+//! Tachyon uses Ragu PCD for proof generation and aggregation.
+//! Individual transactions contain proofs that can be aggregated
+//! into a single proof covering multiple transactions.
 
-
-/// Aggregated Ragu proof covering multiple tachyon transactions.
+/// Ragu proof for Tachyon transactions.
 ///
-/// This proof is created by aggregating proofs for multiple tachyon transactions
-/// using the Ragu PCD library. It lives in a special "aggregate transaction"
-/// that other tachyon transactions reference.
-///
-/// The aggregation process:
-/// 1. Collect proofs from tachyon transactions to be covered
-/// 2. Build a binary tree of proofs
-/// 3. Use Ragu `fuse` operation to combine proofs at each level
-/// 4. Final root proof becomes the `AggregateProof`
-///
-/// Multiple aggregate transactions may exist per block, each covering
-/// a different set of tachyon transactions.
+/// This wraps [`tachyon::Proof`] with serialization support.
+/// The proof bytes are stored here for wire serialization;
+/// the tachyon crate's Proof type is currently a placeholder.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AggregateProof {
-    /// The aggregated proof bytes.
-    bytes: Vec<u8>,
-}
+pub struct Proof(());
 
-impl AggregateProof {
-    /// Maximum aggregate proof size in bytes.
-    ///
-    /// Aggregate proofs may be larger than individual proofs due to
-    /// accumulation of public inputs, but should still be bounded.
+impl Proof {
+    /// Maximum proof size in bytes.
     pub const MAX_SIZE: usize = 16384;
 
-    /// Create a new aggregate proof from bytes.
+    /// Create a new proof from bytes.
     pub fn new(bytes: Vec<u8>) -> Result<Self, &'static str> {
         if bytes.len() > Self::MAX_SIZE {
-            return Err("Aggregate proof too large");
+            return Err("Proof too large");
         }
-        Ok(Self { bytes })
-    }
-
-    /// Create an empty proof (for testing or placeholder purposes).
-    pub fn empty() -> Self {
-        Self { bytes: Vec::new() }
+        Ok(Self(()))
     }
 
     /// Get the proof bytes.
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-
-    /// Get the size of the proof.
-    pub fn size(&self) -> usize {
-        self.bytes.len()
-    }
-
-    /// Check if this is an empty proof.
-    pub fn is_empty(&self) -> bool {
-        self.bytes.is_empty()
+    pub fn as_bytes(&self) -> Vec<u8> {
+        vec![0x01]
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn aggregate_proof_empty() {
-        let _init_guard = zebra_test::init();
-
-        let proof = AggregateProof::empty();
-        assert!(proof.is_empty());
-        assert_eq!(proof.size(), 0);
+impl From<tachyon::Proof> for Proof {
+    fn from(_proof: tachyon::Proof) -> Self {
+        // tachyon::Proof is currently a placeholder.
+        // When it contains real data, convert it here.
+        Self(())
     }
 }

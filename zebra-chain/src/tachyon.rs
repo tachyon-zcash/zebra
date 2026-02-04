@@ -88,6 +88,6 @@ pub use tachyon::{Adjunct, Aggregate, Authorization, Autonome, Nullifier, Unsign
 pub use accumulator::Epoch;
 pub use action::Tachyaction;
 pub use commitment::{NoteCommitment, ValueCommitment};
-pub use proof::AggregateProof;
+pub use proof::Proof;
 pub use shielded_data::{ShieldedData, Tachystamp};
 pub use tachygram::Tachygram;

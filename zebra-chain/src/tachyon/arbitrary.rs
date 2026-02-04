@@ -9,7 +9,7 @@ use super::{
     accumulator::Epoch,
     action::Tachyaction,
     commitment::ValueCommitment,
-    proof::AggregateProof,
+    proof::Proof,
     shielded_data::Tachystamp,
     tachygram::Tachygram,
 };
@@ -59,13 +59,13 @@ impl Arbitrary for Tachyaction {
     }
 }
 
-impl Arbitrary for AggregateProof {
+impl Arbitrary for Proof {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
         proptest::collection::vec(any::<u8>(), 0..256)
-            .prop_map(|bytes| AggregateProof::new(bytes).unwrap())
+            .prop_map(|bytes| Proof::new(bytes).unwrap())
             .boxed()
     }
 }
@@ -77,7 +77,7 @@ impl Arbitrary for Tachystamp {
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
         (
             proptest::collection::vec(any::<Tachygram>(), 0..20),
-            any::<AggregateProof>(),
+            any::<Proof>(),
             any::<Epoch>(),
         )
             .prop_map(|(tachygrams, proof, anchor)| Tachystamp::new(tachygrams, proof, anchor))

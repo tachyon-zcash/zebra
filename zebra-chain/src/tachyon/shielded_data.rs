@@ -27,7 +27,7 @@ use crate::{
 };
 
 use super::{
-    accumulator, action::Tachyaction, commitment::ValueCommitment, proof::AggregateProof,
+    accumulator, action::Tachyaction, commitment::ValueCommitment, proof::Proof,
     tachygram::Tachygram,
 };
 
@@ -86,7 +86,7 @@ pub struct Tachystamp {
     pub tachygrams: Vec<Tachygram>,
 
     /// The Ragu proof covering all operations.
-    pub proof: AggregateProof,
+    pub proof: Proof,
 
     /// The epoch (accumulator state).
     ///
@@ -97,11 +97,7 @@ pub struct Tachystamp {
 
 impl Tachystamp {
     /// Create a new tachystamp.
-    pub fn new(
-        tachygrams: Vec<Tachygram>,
-        proof: AggregateProof,
-        anchor: accumulator::Epoch,
-    ) -> Self {
+    pub fn new(tachygrams: Vec<Tachygram>, proof: Proof, anchor: accumulator::Epoch) -> Self {
         Self {
             tachygrams,
             proof,
@@ -139,7 +135,7 @@ impl fmt::Display for Tachystamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("tachyon::Tachystamp")
             .field("tachygrams", &self.tachygrams.len())
-            .field("proof_size", &self.proof.size())
+            .field("proof_size", &self.proof.as_bytes().len())
             .finish()
     }
 }
