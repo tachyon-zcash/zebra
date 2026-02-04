@@ -62,14 +62,14 @@ pub mod keys;
 pub mod note;
 pub mod primitives;
 pub mod tachygram;
+pub mod tachystamp;
 pub mod value;
 
 pub use action::{Action, RandomizedVerificationKey, SpendAuthSignature, Unsigned};
 pub use address::Address;
-pub use bundle::{
-    Adjunct, Aggregate, Authorization, Autonome, BindingSignature, Bundle, Proof, Tachystamp,
-};
+pub use bundle::{Adjunct, Aggregate, Authorization, Autonome, BindingSignature, Bundle};
 pub use keys::{FullViewingKey, IncomingViewingKey, NullifierKey, SpendingKey};
 pub use note::{Epoch, Note, NoteCommitment, Nullifier, NullifierTrapdoor};
 pub use tachygram::Tachygram;
+pub use tachystamp::{Proof, Tachystamp};
 pub use value::ValueCommitment;

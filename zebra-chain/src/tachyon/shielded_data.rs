@@ -23,7 +23,7 @@ use reddsa::{orchard::Binding, Signature};
 
 use crate::{
     amount::{Amount, NegativeAllowed},
-    serialization::{AtLeastOne, TrustedPreallocate},
+    serialization::AtLeastOne,
 };
 
 use super::{
@@ -175,15 +175,5 @@ impl ShieldedData {
     /// Check if this transaction has been stripped (tachystamp removed).
     pub fn is_stripped(&self) -> bool {
         self.tachystamp.is_none()
-    }
-}
-
-// TrustedPreallocate implementation for bounded deserialization
-impl TrustedPreallocate for Tachyaction {
-    fn max_allocation() -> u64 {
-        // Same logic as Orchard: limit based on max block size
-        // Each action is 128 bytes (cv: 32 + rk: 32 + sig: 64), max block is ~2MB
-        const MAX: u64 = (2_000_000 / Tachyaction::SIZE as u64) + 1;
-        MAX
     }
 }

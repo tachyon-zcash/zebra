@@ -14,17 +14,12 @@
 //! Tachygrams themselves serve as membership witnesses - the Ragu proof system
 //! verifies that a tachygram is a root of the polynomial.
 
-use std::{
-    hash::{Hash, Hasher},
-    io,
-};
+use std::hash::{Hash, Hasher};
 
 use group::ff::PrimeField;
 use halo2::pasta::pallas;
 
-use crate::serialization::{
-    serde_helpers, ReadZcashExt, SerializationError, ZcashDeserialize, ZcashSerialize,
-};
+use crate::serialization::serde_helpers;
 
 /// The epoch (accumulator state) for Tachyon transactions.
 ///
@@ -67,30 +62,6 @@ impl Hash for Epoch {
 impl From<pallas::Base> for Epoch {
     fn from(base: pallas::Base) -> Self {
         Self(base)
-    }
-}
-
-impl TryFrom<[u8; 32]> for Epoch {
-    type Error = SerializationError;
-
-    fn try_from(bytes: [u8; 32]) -> Result<Self, Self::Error> {
-        Option::from(pallas::Base::from_repr(bytes))
-            .map(Self)
-            .ok_or(SerializationError::Parse(
-                "Invalid field element for Tachyon Epoch",
-            ))
-    }
-}
-
-impl ZcashSerialize for Epoch {
-    fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
-        writer.write_all(&self.0.to_repr())
-    }
-}
-
-impl ZcashDeserialize for Epoch {
-    fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
-        Self::try_from(reader.read_32_bytes()?)
     }
 }
 

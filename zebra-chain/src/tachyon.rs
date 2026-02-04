@@ -58,14 +58,15 @@
 //!
 //! ### Blockchain Types (defined here)
 //!
-//! Types with ZcashSerialize/ZcashDeserialize for blockchain storage:
+//! Wrapper types with serde support for state/RPC. Wire serialization for
+//! transactions happens at the bundle level in `transaction/serialize.rs`.
 //!
 //! - [`ShieldedData`] - Tachyon bundle (value_balance, actions, binding_sig, optional tachystamp)
 //! - [`Tachystamp`] - Proof + tachygrams + epoch
 //! - [`Tachyaction`] - cv + rk + spend_auth_sig
 //! - [`ValueCommitment`] - Homomorphic commitment with Add/Sub/Sum
 //! - [`Tachygram`] - 32-byte blob for accumulator entries
-//! - [`Epoch`](accumulator::Epoch) - Serializable accumulator state
+//! - [`Epoch`](accumulator::Epoch) - Accumulator state
 
 #![warn(missing_docs)]
 
@@ -83,7 +84,7 @@ pub mod shielded_data;
 // Re-export protocol types from tachyon crate
 pub use tachyon::{Adjunct, Aggregate, Authorization, Autonome, Nullifier, Unsigned};
 
-// Blockchain-specific types with ZcashSerialize/Deserialize
+// Blockchain-specific wrapper types with serde support
 pub use accumulator::Epoch;
 pub use action::Tachyaction;
 pub use commitment::{NoteCommitment, ValueCommitment};

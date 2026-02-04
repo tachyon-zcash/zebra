@@ -7,12 +7,6 @@
 //! Multiple aggregate transactions may exist per block, and regular tachyon
 //! transactions specify which aggregate covers them.
 
-use std::io;
-
-use crate::serialization::{
-    zcash_serialize_bytes, SerializationError, ZcashDeserialize, ZcashDeserializeInto,
-    ZcashSerialize,
-};
 
 /// Aggregated Ragu proof covering multiple tachyon transactions.
 ///
@@ -70,38 +64,9 @@ impl AggregateProof {
     }
 }
 
-impl ZcashSerialize for AggregateProof {
-    fn zcash_serialize<W: io::Write>(&self, writer: W) -> Result<(), io::Error> {
-        zcash_serialize_bytes(&self.bytes, writer)
-    }
-}
-
-impl ZcashDeserialize for AggregateProof {
-    fn zcash_deserialize<R: io::Read>(reader: R) -> Result<Self, SerializationError> {
-        let bytes: Vec<u8> = reader.zcash_deserialize_into()?;
-        if bytes.len() > Self::MAX_SIZE {
-            return Err(SerializationError::Parse("Aggregate proof too large"));
-        }
-        Ok(Self { bytes })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn aggregate_proof_roundtrip() {
-        let _init_guard = zebra_test::init();
-
-        let proof = AggregateProof::new(vec![1, 2, 3, 4, 5]).unwrap();
-
-        let mut bytes = Vec::new();
-        proof.zcash_serialize(&mut bytes).unwrap();
-
-        let proof2 = AggregateProof::zcash_deserialize(&bytes[..]).unwrap();
-        assert_eq!(proof, proof2);
-    }
 
     #[test]
     fn aggregate_proof_empty() {

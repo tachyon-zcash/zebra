@@ -13,7 +13,7 @@
 //! Use [`NoteCommitment::to_tachyon`] to convert from the full point to the extracted
 //! x-coordinate for accumulator operations.
 
-use std::{fmt, io, iter::Sum, ops};
+use std::{fmt, iter::Sum, ops};
 
 use group::{ff::PrimeField, prime::PrimeCurveAffine, GroupEncoding};
 use halo2::{
@@ -21,12 +21,7 @@ use halo2::{
     pasta::pallas,
 };
 
-use crate::{
-    amount::Amount,
-    serialization::{
-        serde_helpers, ReadZcashExt, SerializationError, ZcashDeserialize, ZcashSerialize,
-    },
-};
+use crate::{amount::Amount, serialization::serde_helpers};
 
 /// Note commitment for Tachyon notes.
 ///
@@ -43,9 +38,7 @@ impl NoteCommitment {
         // For non-identity points, return the x-coordinate.
         // For identity, return zero (same as Orchard behavior).
         let coords: Option<Coordinates<pallas::Affine>> = self.0.coordinates().into();
-        coords
-            .map(|c| *c.x())
-            .unwrap_or_else(pallas::Base::zero)
+        coords.map(|c| *c.x()).unwrap_or_else(pallas::Base::zero)
     }
 
     /// Extract the x-coordinate as bytes.
@@ -142,6 +135,11 @@ impl ValueCommitment {
         let v = pallas::Scalar::from(value);
         Self::from(*V * v + *R * rcv)
     }
+
+    /// Convert to bytes.
+    pub fn to_bytes(self) -> [u8; 32] {
+        self.0.to_bytes()
+    }
 }
 
 impl fmt::Debug for ValueCommitment {
@@ -206,22 +204,7 @@ impl ops::Sub for ValueCommitment {
 
 impl Sum for ValueCommitment {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(
-            ValueCommitment(pallas::Affine::identity()),
-            ops::Add::add,
-        )
-    }
-}
-
-impl ZcashSerialize for ValueCommitment {
-    fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
-        writer.write_all(&self.0.to_bytes())
-    }
-}
-
-impl ZcashDeserialize for ValueCommitment {
-    fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
-        Self::try_from(reader.read_32_bytes()?).map_err(SerializationError::Parse)
+        iter.fold(ValueCommitment(pallas::Affine::identity()), ops::Add::add)
     }
 }
 

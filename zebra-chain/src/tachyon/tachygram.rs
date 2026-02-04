@@ -6,15 +6,12 @@
 use std::{
     fmt,
     hash::{Hash, Hasher},
-    io,
 };
 
 use group::ff::PrimeField;
 use halo2::pasta::pallas;
 
-use crate::serialization::{
-    serde_helpers, ReadZcashExt, SerializationError, ZcashDeserialize, ZcashSerialize,
-};
+use crate::serialization::serde_helpers;
 
 use super::commitment::NoteCommitment;
 
@@ -56,51 +53,8 @@ impl fmt::Debug for Tachygram {
     }
 }
 
-impl From<pallas::Base> for Tachygram {
-    fn from(value: pallas::Base) -> Self {
-        Self(value)
-    }
-}
-
 impl From<tachyon::Tachygram> for Tachygram {
     fn from(tg: tachyon::Tachygram) -> Self {
         Self(tg.0)
-    }
-}
-
-impl ZcashSerialize for Tachygram {
-    fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
-        writer.write_all(&self.0.to_repr())
-    }
-}
-
-impl ZcashDeserialize for Tachygram {
-    fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
-        let bytes = reader.read_32_bytes()?;
-        Option::from(pallas::Base::from_repr(bytes))
-            .map(Self)
-            .ok_or(SerializationError::Parse(
-                "Invalid field element for Tachygram",
-            ))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn tachygram_roundtrip() {
-        let _init_guard = zebra_test::init();
-
-        let tg = Tachygram(pallas::Base::from(42u64));
-
-        let mut bytes = Vec::new();
-        tg.zcash_serialize(&mut bytes).unwrap();
-
-        assert_eq!(bytes.len(), Tachygram::SIZE);
-
-        let tg2 = Tachygram::zcash_deserialize(&bytes[..]).unwrap();
-        assert_eq!(tg, tg2);
     }
 }

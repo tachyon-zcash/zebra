@@ -9,11 +9,7 @@
 //! - Proof is aggregated at block level, not per-action
 //! - Signature included directly (Sapling pattern, not Orchard wrapper pattern)
 
-use std::io;
-
 use reddsa::{orchard::SpendAuth, Signature};
-
-use crate::serialization::{ReadZcashExt, SerializationError, ZcashDeserialize, ZcashSerialize};
 
 use super::commitment::ValueCommitment;
 
@@ -49,30 +45,4 @@ impl Tachyaction {
     /// due to the absence of encrypted ciphertexts and because nullifiers
     /// and note commitments are moved to the Tachystamp as tachygrams.
     pub const SIZE: usize = 128;
-}
-
-impl ZcashSerialize for Tachyaction {
-    fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
-        self.cv.zcash_serialize(&mut writer)?;
-        writer.write_all(&<[u8; 32]>::from(self.rk))?;
-        writer.write_all(&<[u8; 64]>::from(self.spend_auth_sig))?;
-        Ok(())
-    }
-}
-
-impl ZcashDeserialize for Tachyaction {
-    fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
-        let cv = ValueCommitment::zcash_deserialize(&mut reader)?;
-        let rk = reader.read_32_bytes()?.into();
-
-        let mut sig_bytes = [0u8; 64];
-        reader.read_exact(&mut sig_bytes)?;
-        let spend_auth_sig = Signature::from(sig_bytes);
-
-        Ok(Self {
-            cv,
-            rk,
-            spend_auth_sig,
-        })
-    }
 }

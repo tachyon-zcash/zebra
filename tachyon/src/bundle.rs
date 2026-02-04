@@ -3,7 +3,6 @@
 //! This module defines the bundle types for Tachyon transactions:
 //!
 //! - [`Bundle`] - The main bundle type containing actions and authorization
-//! - [`Tachystamp`] - Contains tachygrams, proof, and epoch
 //! - [`Authorization`] - Trait for tracking bundle authorization state
 //!
 //! ## Authorization States
@@ -29,9 +28,8 @@ use std::fmt;
 use std::vec::Vec;
 
 use crate::Action;
-use crate::Tachygram;
 use crate::action::{SpendAuthSignature, Unsigned};
-use crate::note::Epoch;
+use crate::tachystamp::Tachystamp;
 
 /// A binding signature for value balance verification.
 ///
@@ -49,95 +47,6 @@ impl From<[u8; 64]> for BindingSignature {
 impl From<BindingSignature> for [u8; 64] {
     fn from(sig: BindingSignature) -> Self {
         sig.0
-    }
-}
-
-/// A placeholder for the Ragu proof.
-///
-/// This will be replaced with the actual Ragu proof type when available.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Proof(Vec<u8>);
-
-impl Proof {
-    /// Creates a new proof from bytes.
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self(bytes)
-    }
-
-    /// Returns the byte representation of this proof.
-    pub fn to_bytes(&self) -> &[u8] {
-        &self.0
-    }
-
-    /// Creates an empty proof (for testing).
-    pub fn empty() -> Self {
-        Self(Vec::new())
-    }
-
-    /// Returns the size of this proof in bytes.
-    pub fn size(&self) -> usize {
-        self.0.len()
-    }
-}
-
-/// Tachystamp containing the proof, tachygrams, and epoch.
-///
-/// This type bundles:
-/// - All tachygrams (nullifiers and note commitments) for the transaction
-/// - The Ragu proof proving validity of all operations
-/// - The epoch (accumulator anchor)
-///
-/// Present in [`Autonome`] bundles (self-contained) and [`Aggregate`] bundles
-/// (covering multiple [`Adjunct`] bundles).
-///
-/// Epochs from multiple tachystamps can be accumulated into a single epoch
-/// during proof aggregation.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Tachystamp {
-    /// All tachygrams from this transaction.
-    ///
-    /// These are the nullifiers and note commitments that get recorded
-    /// in the polynomial accumulator.
-    tachygrams: Vec<Tachygram>,
-
-    /// The Ragu proof covering all operations.
-    proof: Proof,
-
-    /// The epoch (recent accumulator state).
-    ///
-    /// All spends in this transaction reference notes committed at or
-    /// before this accumulator state. Epochs are valid within a range.
-    epoch: Epoch,
-}
-
-impl Tachystamp {
-    /// Creates a new tachystamp.
-    pub fn new(tachygrams: Vec<Tachygram>, proof: Proof, epoch: Epoch) -> Self {
-        Self {
-            tachygrams,
-            proof,
-            epoch,
-        }
-    }
-
-    /// Returns the tachygrams in this tachystamp.
-    pub fn tachygrams(&self) -> &[Tachygram] {
-        &self.tachygrams
-    }
-
-    /// Returns the proof.
-    pub fn proof(&self) -> &Proof {
-        &self.proof
-    }
-
-    /// Returns the epoch.
-    pub fn epoch(&self) -> &Epoch {
-        &self.epoch
-    }
-
-    /// Returns the number of tachygrams in this tachystamp.
-    pub fn tachygram_count(&self) -> usize {
-        self.tachygrams.len()
     }
 }
 
