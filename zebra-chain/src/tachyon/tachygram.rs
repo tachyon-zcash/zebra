@@ -34,14 +34,16 @@ impl Hash for Tachygram {
 impl Tachygram {
     /// The size of a serialized Tachygram in bytes.
     pub const SIZE: usize = 32;
+}
 
-    /// Create a Tachygram from a Tachyon nullifier.
-    pub fn from_nullifier(nf: &tachyon::Nullifier) -> Self {
+impl From<&tachyon::Nullifier> for Tachygram {
+    fn from(nf: &tachyon::Nullifier) -> Self {
         Self(nf.0)
     }
+}
 
-    /// Create a Tachygram from a Tachyon note commitment.
-    pub fn from_note_commitment(cm: &NoteCommitment) -> Self {
+impl From<&NoteCommitment> for Tachygram {
+    fn from(cm: &NoteCommitment) -> Self {
         Self(cm.extract_x())
     }
 }
@@ -60,21 +62,9 @@ impl From<pallas::Base> for Tachygram {
     }
 }
 
-impl From<Tachygram> for pallas::Base {
-    fn from(tg: Tachygram) -> Self {
-        tg.0
-    }
-}
-
 impl From<tachyon::Tachygram> for Tachygram {
     fn from(tg: tachyon::Tachygram) -> Self {
         Self(tg.0)
-    }
-}
-
-impl From<Tachygram> for tachyon::Tachygram {
-    fn from(tg: Tachygram) -> Self {
-        tachyon::Tachygram(tg.0)
     }
 }
 
@@ -87,14 +77,11 @@ impl ZcashSerialize for Tachygram {
 impl ZcashDeserialize for Tachygram {
     fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
         let bytes = reader.read_32_bytes()?;
-        let base = pallas::Base::from_repr(bytes);
-        if base.is_some().into() {
-            Ok(Self(base.unwrap()))
-        } else {
-            Err(SerializationError::Parse(
+        Option::from(pallas::Base::from_repr(bytes))
+            .map(Self)
+            .ok_or(SerializationError::Parse(
                 "Invalid field element for Tachygram",
             ))
-        }
     }
 }
 

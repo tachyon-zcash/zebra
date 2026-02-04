@@ -3,13 +3,13 @@
 //! This module defines types for Tachyon transactions:
 //!
 //! - [`ShieldedData`] - Tachyon bundle containing actions, value balance, and optional tachystamp
-//! - [`Tachystamp`] - Contains tachygrams, proof, and anchor (stripped during aggregation)
+//! - [`Tachystamp`] - Contains tachygrams, proof, and epoch (stripped during aggregation)
 //!
 //! ## Aggregate Transaction Model
 //!
 //! Tachyon uses an aggregate proof model:
 //!
-//! 1. Users broadcast full transactions with tachystamp (tachygrams, proof, anchor)
+//! 1. Users broadcast full transactions with tachystamp (tachygrams, proof, epoch)
 //! 2. Aggregators collect transactions and merge tachystamps
 //! 3. In blocks, individual transactions are **stripped** (tachystamp set to None)
 //! 4. The aggregate transaction (coinbase) contains the merged tachystamp
@@ -37,7 +37,7 @@ use super::{
 /// and `orchard::ShieldedData`.
 ///
 /// The `tachystamp` field handles both broadcast and stripped forms:
-/// - `Some(tachystamp)` - Full transaction as broadcast (contains proof, tachygrams, anchor)
+/// - `Some(tachystamp)` - Full transaction as broadcast (contains proof, tachygrams, epoch)
 /// - `None` - Stripped transaction in a block (tachystamp moved to coinbase aggregate)
 ///
 /// Note: Unlike Orchard, Tachyon does not have a `flags` field. Tachyon's unified
@@ -61,19 +61,19 @@ pub struct ShieldedData {
     /// declared value_balance without revealing actual amounts.
     pub binding_sig: Signature<Binding>,
 
-    /// The tachystamp containing proof, tachygrams, and anchor.
+    /// The tachystamp containing proof, tachygrams, and epoch.
     ///
     /// Present when the transaction is broadcast, None after stripping
     /// during aggregation.
     pub tachystamp: Option<Tachystamp>,
 }
 
-/// Tachystamp containing the proof, tachygrams, and anchor.
+/// Tachystamp containing the proof, tachygrams, and epoch.
 ///
 /// This type bundles:
 /// - All tachygrams (nullifiers and note commitments) for the transaction
 /// - The Ragu proof proving validity of all operations
-/// - The accumulator anchor
+/// - The epoch (accumulator state)
 ///
 /// During aggregation, tachystamps are merged into a single aggregate
 /// tachystamp that goes into the coinbase transaction.
@@ -88,11 +88,11 @@ pub struct Tachystamp {
     /// The Ragu proof covering all operations.
     pub proof: AggregateProof,
 
-    /// Recent accumulator anchor.
+    /// The epoch (accumulator state).
     ///
     /// All spends in this transaction reference notes committed at or
     /// before this accumulator state.
-    pub anchor: accumulator::Anchor,
+    pub epoch: accumulator::Epoch,
 }
 
 impl Tachystamp {
@@ -100,12 +100,12 @@ impl Tachystamp {
     pub fn new(
         tachygrams: Vec<Tachygram>,
         proof: AggregateProof,
-        anchor: accumulator::Anchor,
+        epoch: accumulator::Epoch,
     ) -> Self {
         Self {
             tachygrams,
             proof,
-            anchor,
+            epoch,
         }
     }
 

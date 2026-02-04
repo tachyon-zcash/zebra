@@ -38,19 +38,7 @@ use crate::note::Epoch;
 /// This signature proves that the value commitments in actions sum to the
 /// declared value balance without revealing actual amounts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct BindingSignature([u8; 64]);
-
-impl BindingSignature {
-    /// Creates a new binding signature from bytes.
-    pub fn from_bytes(bytes: [u8; 64]) -> Self {
-        Self(bytes)
-    }
-
-    /// Returns the byte representation of this signature.
-    pub fn to_bytes(&self) -> [u8; 64] {
-        self.0
-    }
-}
+pub struct BindingSignature(pub [u8; 64]);
 
 impl From<[u8; 64]> for BindingSignature {
     fn from(bytes: [u8; 64]) -> Self {

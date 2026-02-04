@@ -4,8 +4,6 @@
 //! Tachyon uses a unified polynomial accumulator that tracks both via tachygrams.
 //! This enables more efficient proofs in the recursive (PCD) context.
 
-use ff::PrimeField;
-
 use crate::note::{NoteCommitment, Nullifier};
 use crate::primitives::Fp;
 
@@ -18,19 +16,6 @@ use crate::primitives::Fp;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tachygram(pub Fp);
 
-impl Tachygram {
-    /// Returns the byte representation of this tachygram.
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0.to_repr()
-    }
-
-    /// Creates a tachygram from bytes.
-    ///
-    /// Returns `None` if the bytes do not represent a valid field element.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Option<Self> {
-        Fp::from_repr(*bytes).map(Self).into()
-    }
-}
 
 impl From<NoteCommitment> for Tachygram {
     fn from(commitment: NoteCommitment) -> Self {

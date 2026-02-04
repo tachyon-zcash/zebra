@@ -44,24 +44,9 @@ pub struct NullifierTrapdoor(pub Fp);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Epoch(pub Fp);
 
-impl Epoch {
-    /// Returns the byte representation of this epoch.
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0.to_repr()
-    }
-
-    /// Creates an epoch from bytes.
-    ///
-    /// Returns `None` if the bytes do not represent a valid field element.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Option<Self> {
-        Fp::from_repr(*bytes).map(Self).into()
-    }
-}
-
 impl std::fmt::Display for Epoch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let bytes = self.to_bytes();
-        for b in &bytes[..8] {
+        for b in &self.0.to_repr()[..8] {
             write!(f, "{:02x}", b)?;
         }
         write!(f, "...")
@@ -84,19 +69,6 @@ impl std::fmt::Display for Epoch {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Nullifier(pub Fp);
 
-impl Nullifier {
-    /// Returns the byte representation of this nullifier.
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0.to_repr()
-    }
-
-    /// Creates a nullifier from bytes.
-    ///
-    /// Returns `None` if the bytes do not represent a valid field element.
-    pub fn from_bytes(bytes: &[u8; 32]) -> Option<Self> {
-        Fp::from_repr(*bytes).map(Self).into()
-    }
-}
 
 /// A note commitment.
 ///
@@ -105,9 +77,3 @@ impl Nullifier {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NoteCommitment(pub Fp);
 
-impl NoteCommitment {
-    /// Returns the byte representation.
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0.to_repr()
-    }
-}

@@ -6,7 +6,7 @@ use proptest::{arbitrary::any, prelude::*};
 use reddsa::Signature;
 
 use super::{
-    accumulator::Anchor,
+    accumulator::Epoch,
     action::Tachyaction,
     commitment::ValueCommitment,
     proof::AggregateProof,
@@ -78,20 +78,20 @@ impl Arbitrary for Tachystamp {
         (
             proptest::collection::vec(any::<Tachygram>(), 0..20),
             any::<AggregateProof>(),
-            any::<Anchor>(),
+            any::<Epoch>(),
         )
             .prop_map(|(tachygrams, proof, anchor)| Tachystamp::new(tachygrams, proof, anchor))
             .boxed()
     }
 }
 
-impl Arbitrary for Anchor {
+impl Arbitrary for Epoch {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
         any::<u64>()
-            .prop_map(|val| Anchor::from(pallas::Base::from(val)))
+            .prop_map(|val| Epoch::from(pallas::Base::from(val)))
             .boxed()
     }
 }

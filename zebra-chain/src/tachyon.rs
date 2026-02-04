@@ -3,7 +3,7 @@
 //! Tachyon is a scaling solution for Zcash that introduces:
 //! - Tachygrams: Unified 32-byte blobs (nullifiers or note commitments)
 //! - Tachyactions: Spend/output operations with cv, rk, and signature
-//! - Tachystamps: Proof + tachygrams + anchor
+//! - Tachystamps: Proof + tachygrams + epoch
 //! - Aggregate proof transactions via Ragu PCD
 //! - Out-of-band payment distribution (no ciphertexts on-chain)
 //!
@@ -41,7 +41,7 @@
 //!     └── Tachystamp
 //!         ├── tachygrams: Vec<Tachygram>
 //!         ├── proof: AggregateProof
-//!         └── anchor: Anchor
+//!         └── epoch: Epoch
 //! ```
 //!
 //! ## Crate Organization
@@ -52,9 +52,7 @@
 //!
 //! Core protocol types used for transaction construction:
 //!
-//! - [`Epoch`] - Epoch identifier for nullifier flavoring
-//! - [`Nullifier`] - Nullifier value (without epoch)
-//! - [`Anchor`] - A recent state identifier
+//! - [`Nullifier`] - Nullifier value
 //! - [`Authorization`] - Trait for bundle authorization states
 //! - [`Unsigned`], [`Autonome`], [`Adjunct`], [`Aggregate`] - Authorization state types
 //!
@@ -63,17 +61,16 @@
 //! Types with ZcashSerialize/ZcashDeserialize for blockchain storage:
 //!
 //! - [`ShieldedData`] - Tachyon bundle (value_balance, actions, binding_sig, optional tachystamp)
-//! - [`Tachystamp`] - Proof + tachygrams + anchor
+//! - [`Tachystamp`] - Proof + tachygrams + epoch
 //! - [`Tachyaction`] - cv + rk + spend_auth_sig
 //! - [`ValueCommitment`] - Homomorphic commitment with Add/Sub/Sum
 //! - [`Tachygram`] - 32-byte blob for accumulator entries
-//! - [`Anchor`](accumulator::Anchor) - Serializable accumulator root
+//! - [`Epoch`](accumulator::Epoch) - Serializable accumulator state
 
 #![warn(missing_docs)]
 
 mod action;
 mod commitment;
-mod nullifier;
 mod proof;
 mod tachygram;
 
@@ -84,12 +81,12 @@ pub mod accumulator;
 pub mod shielded_data;
 
 // Re-export protocol types from tachyon crate
-pub use tachyon::{Adjunct, Aggregate, Authorization, Autonome, Epoch, Nullifier, Unsigned};
+pub use tachyon::{Adjunct, Aggregate, Authorization, Autonome, Nullifier, Unsigned};
 
 // Blockchain-specific types with ZcashSerialize/Deserialize
+pub use accumulator::Epoch;
 pub use action::Tachyaction;
 pub use commitment::{NoteCommitment, ValueCommitment};
-pub use nullifier::FlavoredNullifier;
 pub use proof::AggregateProof;
 pub use shielded_data::{ShieldedData, Tachystamp};
 pub use tachygram::Tachygram;
