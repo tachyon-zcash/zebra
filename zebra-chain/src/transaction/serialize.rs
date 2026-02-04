@@ -510,13 +510,11 @@ impl ZcashSerialize for tachyon::ShieldedData {
             .as_ref()
             .map(|s| s.tachygrams.len())
             .unwrap_or(0);
-        let n_tachygrams_compact = CompactSizeMessage::try_from(n_tachygrams)
-            .expect("tachygram count fits in CompactSizeMessage");
+        let n_tachygrams_compact = CompactSizeMessage::try_from(n_tachygrams)?;
         n_tachygrams_compact.zcash_serialize(&mut writer)?;
 
         // nActions
-        let n_actions = CompactSizeMessage::try_from(self.actions.len())
-            .expect("actions count fits in CompactSizeMessage");
+        let n_actions = CompactSizeMessage::try_from(self.actions.len())?;
         n_actions.zcash_serialize(&mut writer)?;
 
         // vTachygrams, proof, epoch (if tachystamp present)
