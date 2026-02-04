@@ -71,5 +71,5 @@ pub use bundle::{Adjunct, Aggregate, Authorization, Autonome, BindingSignature, 
 pub use keys::{FullViewingKey, IncomingViewingKey, NullifierKey, SpendingKey};
 pub use note::{Epoch, Note, NoteCommitment, Nullifier, NullifierTrapdoor};
 pub use tachygram::Tachygram;
-pub use tachystamp::{Proof, Tachystamp};
+pub use tachystamp::Tachystamp;
 pub use value::ValueCommitment;

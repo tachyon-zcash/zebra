@@ -476,7 +476,7 @@ impl<T: reddsa::SigType> ZcashDeserialize for reddsa::Signature<T> {
 // nActions       : compactsize
 // vTachygrams    : nTachygrams * 32 bytes  (if nTachygrams > 0)
 // proof          : size-prefixed bytes     (if nTachygrams > 0)
-// epoch          : 32 bytes                (if nTachygrams > 0)
+// anchor         : 32 bytes                (if nTachygrams > 0)
 // vActions       : nActions * (cv:32 + rk:32 + sig:64 = 128 bytes)
 // valueBalance   : i64
 // bindingSig     : 64 bytes
@@ -517,7 +517,7 @@ impl ZcashSerialize for tachyon::ShieldedData {
         let n_actions = CompactSizeMessage::try_from(self.actions.len())?;
         n_actions.zcash_serialize(&mut writer)?;
 
-        // vTachygrams, proof, epoch (if tachystamp present)
+        // vTachygrams, proof, anchor (if tachystamp present)
         if let Some(stamp) = &self.tachystamp {
             for tg in &stamp.tachygrams {
                 writer.write_all(&tg.0.to_repr())?;
@@ -526,8 +526,8 @@ impl ZcashSerialize for tachyon::ShieldedData {
             // proof (size-prefixed)
             zcash_serialize_bytes(&stamp.proof.as_bytes().to_vec(), &mut writer)?;
 
-            // epoch
-            writer.write_all(&stamp.epoch.0.to_repr())?;
+            // anchor
+            writer.write_all(&stamp.anchor.0.to_repr())?;
         }
 
         // vActions
@@ -567,7 +567,7 @@ impl ZcashDeserialize for Option<tachyon::ShieldedData> {
             return Ok(None);
         }
 
-        // vTachygrams, proof, epoch (if nTachygrams > 0)
+        // vTachygrams, proof, anchor (if nTachygrams > 0)
         let tachystamp = if n_tachygrams > 0 {
             let mut tachygrams = Vec::with_capacity(n_tachygrams);
             for _ in 0..n_tachygrams {
@@ -586,15 +586,15 @@ impl ZcashDeserialize for Option<tachyon::ShieldedData> {
             let proof = tachyon::AggregateProof::new(proof_bytes)
                 .map_err(|_| SerializationError::Parse("Aggregate proof too large"))?;
 
-            // epoch
-            let epoch_bytes: [u8; 32] = reader.read_32_bytes()?;
-            let epoch_elem = pallas::Base::from_repr(epoch_bytes);
-            if epoch_elem.is_none().into() {
-                return Err(SerializationError::Parse("Invalid pallas::Base in epoch"));
+            // anchor
+            let anchor_bytes: [u8; 32] = reader.read_32_bytes()?;
+            let anchor_elem = pallas::Base::from_repr(anchor_bytes);
+            if anchor_elem.is_none().into() {
+                return Err(SerializationError::Parse("Invalid pallas::Base in anchor"));
             }
-            let epoch = tachyon::accumulator::Epoch(epoch_elem.unwrap());
+            let anchor = tachyon::accumulator::Epoch(anchor_elem.unwrap());
 
-            Some(tachyon::Tachystamp::new(tachygrams, proof, epoch))
+            Some(tachyon::Tachystamp::new(tachygrams, proof, anchor))
         } else {
             None
         };

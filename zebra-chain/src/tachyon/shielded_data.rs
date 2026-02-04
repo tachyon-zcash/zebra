@@ -92,7 +92,7 @@ pub struct Tachystamp {
     ///
     /// All spends in this transaction reference notes committed at or
     /// before this accumulator state.
-    pub epoch: accumulator::Epoch,
+    pub anchor: accumulator::Epoch,
 }
 
 impl Tachystamp {
@@ -100,12 +100,12 @@ impl Tachystamp {
     pub fn new(
         tachygrams: Vec<Tachygram>,
         proof: AggregateProof,
-        epoch: accumulator::Epoch,
+        anchor: accumulator::Epoch,
     ) -> Self {
         Self {
             tachygrams,
             proof,
-            epoch,
+            anchor,
         }
     }
 

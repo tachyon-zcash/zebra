@@ -4,39 +4,11 @@
 //! validity within the polynomial accumulator system:
 //!
 //! - **Tachygrams**: Nullifiers and note commitments as polynomial roots
-//! - **Proof**: The Ragu proof covering all operations
+//! - **Proof**: The Ragu proof covering all operations (placeholder)
 //! - **Epoch**: The accumulator state anchor
 
-use crate::note::Epoch;
 use crate::Tachygram;
-
-/// A placeholder for the Ragu proof.
-///
-/// This will be replaced with the actual Ragu proof type when available.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Proof(());
-
-impl Proof {
-    /// Creates a new proof from bytes.
-    pub fn from_bytes(_: Vec<u8>) -> Self {
-        Self(())
-    }
-
-    /// Returns the byte representation of this proof.
-    pub fn to_bytes(&self) -> &[u8] {
-        &[]
-    }
-
-    /// Creates an empty proof (for testing).
-    pub fn empty() -> Self {
-        Self(())
-    }
-
-    /// Returns the size of this proof in bytes.
-    pub fn size(&self) -> usize {
-        0
-    }
-}
+use crate::note::Epoch;
 
 /// Tachystamp containing the proof, tachygrams, and epoch.
 ///
@@ -60,22 +32,22 @@ pub struct Tachystamp {
     tachygrams: Vec<Tachygram>,
 
     /// The Ragu proof covering all operations.
-    proof: Proof,
+    proof: (),
 
     /// The epoch (recent accumulator state).
     ///
     /// All spends in this transaction reference notes committed at or
     /// before this accumulator state. Epochs are valid within a range.
-    epoch: Epoch,
+    anchor: Epoch,
 }
 
 impl Tachystamp {
     /// Creates a new tachystamp.
-    pub fn new(tachygrams: Vec<Tachygram>, proof: Proof, epoch: Epoch) -> Self {
+    pub fn new(tachygrams: Vec<Tachygram>, proof: (), anchor: Epoch) -> Self {
         Self {
             tachygrams,
             proof,
-            epoch,
+            anchor,
         }
     }
 
@@ -85,13 +57,13 @@ impl Tachystamp {
     }
 
     /// Returns the proof.
-    pub fn proof(&self) -> &Proof {
+    pub fn proof(&self) -> &() {
         &self.proof
     }
 
-    /// Returns the epoch.
-    pub fn epoch(&self) -> &Epoch {
-        &self.epoch
+    /// Returns the anchor epoch.
+    pub fn anchor(&self) -> &Epoch {
+        &self.anchor
     }
 
     /// Returns the number of tachygrams in this tachystamp.
