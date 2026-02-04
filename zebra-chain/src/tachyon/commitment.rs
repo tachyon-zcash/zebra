@@ -58,7 +58,7 @@ impl NoteCommitment {
     /// The tachyon crate represents note commitments as field elements (the x-coordinate),
     /// which is what gets accumulated in the polynomial accumulator.
     pub fn to_tachyon(&self) -> tachyon::NoteCommitment {
-        tachyon::NoteCommitment::from_field(self.extract_x())
+        tachyon::NoteCommitment(self.extract_x())
     }
 }
 

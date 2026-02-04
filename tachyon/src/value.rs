@@ -1,40 +1,15 @@
 //! Tachyon value types.
 
+use crate::primitives::PallasPoint;
+
 /// A value commitment for a Tachyon action.
 ///
 /// Commits to the value being transferred in an action without revealing it.
-/// Used in value balance verification within the Ragu proof.
+/// This is a Pedersen commitment (curve point) used in value balance verification.
 ///
-/// This is a stub type for future implementation.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ValueCommitment([u8; 32]);
-
-impl ValueCommitment {
-    /// Creates a new value commitment from bytes.
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
-        ValueCommitment(bytes)
-    }
-
-    /// Returns the byte representation of this value commitment.
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0
-    }
-}
-
-impl From<[u8; 32]> for ValueCommitment {
-    fn from(bytes: [u8; 32]) -> Self {
-        ValueCommitment(bytes)
-    }
-}
-
-impl From<ValueCommitment> for [u8; 32] {
-    fn from(commitment: ValueCommitment) -> Self {
-        commitment.0
-    }
-}
-
-impl AsRef<[u8; 32]> for ValueCommitment {
-    fn as_ref(&self) -> &[u8; 32] {
-        &self.0
-    }
-}
+/// The commitment has the form: `[v] V + [rcv] R` where:
+/// - `v` is the value
+/// - `rcv` is the randomness
+/// - `V` and `R` are generator points
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ValueCommitment(pub PallasPoint);

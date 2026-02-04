@@ -11,15 +11,15 @@
 //! This enables efficient set membership and non-membership proofs using
 //! polynomial evaluation, which integrates with the Ragu PCD system.
 //!
+//! Tachygrams themselves serve as membership witnesses - the Ragu proof system
+//! verifies that a tachygram is a root of the polynomial.
+//!
 //! ## Types
 //!
-//! - [`Anchor`] - serializable accumulator root for blockchain storage
-//! - [`tachyon::AccumulatorRoot`] - protocol-level root type from the tachyon crate
+//! - [`Anchor`] - serializable accumulator anchor for blockchain storage
+//! - [`tachyon::Epoch`] - protocol-level epoch (anchor) type from the tachyon crate
 //!
 //! Use conversion methods to move between these representations.
-//!
-//! **TODO**: This module is a placeholder. The actual accumulator implementation
-//! will be provided by the Ragu library integration.
 
 use std::{
     fmt,
@@ -48,30 +48,17 @@ pub struct Anchor(#[serde(with = "serde_helpers::Base")] pub pallas::Base);
 impl Anchor {
     /// The size of a serialized Anchor in bytes.
     pub const SIZE: usize = 32;
+}
 
-    /// Create an anchor from a pallas::Base value.
-    pub fn from_base(base: pallas::Base) -> Self {
+impl From<pallas::Base> for Anchor {
+    fn from(base: pallas::Base) -> Self {
         Self(base)
     }
+}
 
-    /// Get the underlying pallas::Base value.
-    pub fn to_base(&self) -> pallas::Base {
-        self.0
-    }
-
-    /// Create an anchor from bytes.
-    pub fn try_from_bytes(bytes: [u8; 32]) -> Result<Self, &'static str> {
-        let base = pallas::Base::from_repr(bytes);
-        if base.is_some().into() {
-            Ok(Self(base.unwrap()))
-        } else {
-            Err("Invalid pallas::Base value for accumulator anchor")
-        }
-    }
-
-    /// Convert to bytes.
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0.to_repr()
+impl From<Anchor> for pallas::Base {
+    fn from(anchor: Anchor) -> Self {
+        anchor.0
     }
 }
 
@@ -86,15 +73,6 @@ impl fmt::Debug for Anchor {
 impl fmt::Display for Anchor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0.to_repr()))
-    }
-}
-
-impl Default for Anchor {
-    fn default() -> Self {
-        // The empty accumulator anchor.
-        // TODO: This should be the commitment to the identity polynomial,
-        // computed based on the Ragu accumulator specification.
-        Self(pallas::Base::zero())
     }
 }
 
@@ -143,18 +121,17 @@ impl ZcashDeserialize for Anchor {
     }
 }
 
-impl From<tachyon::AccumulatorRoot> for Anchor {
-    fn from(root: tachyon::AccumulatorRoot) -> Self {
-        // Convert the tachyon AccumulatorRoot bytes to pallas::Base
-        let bytes = root.to_bytes();
-        Self(pallas::Base::from_repr(bytes).expect("valid field element from AccumulatorRoot"))
+impl From<tachyon::Epoch> for Anchor {
+    fn from(epoch: tachyon::Epoch) -> Self {
+        // Convert the tachyon Epoch bytes to pallas::Base
+        let bytes = epoch.to_bytes();
+        Self(pallas::Base::from_repr(bytes).expect("valid field element from tachyon::Epoch"))
     }
 }
 
-impl From<Anchor> for tachyon::AccumulatorRoot {
+impl From<Anchor> for tachyon::Epoch {
     fn from(anchor: Anchor) -> Self {
-        tachyon::AccumulatorRoot::from_bytes(&anchor.0.to_repr())
-            .expect("valid field element from Anchor")
+        tachyon::Epoch::from_bytes(&anchor.0.to_repr()).expect("valid field element from Anchor")
     }
 }
 
@@ -177,7 +154,7 @@ mod tests {
     fn anchor_serialization_roundtrip() {
         let _init_guard = zebra_test::init();
 
-        let anchor = Anchor::from_base(pallas::Base::from(12345u64));
+        let anchor: Anchor = pallas::Base::from(12345u64).into();
 
         let mut bytes = Vec::new();
         anchor.zcash_serialize(&mut bytes).unwrap();
@@ -193,6 +170,6 @@ mod tests {
         let _init_guard = zebra_test::init();
 
         let anchor = Anchor::default();
-        assert_eq!(anchor.to_base(), pallas::Base::zero());
+        assert_eq!(pallas::Base::from(anchor), pallas::Base::zero());
     }
 }

@@ -4,7 +4,7 @@
 //! Tachyon uses a unified polynomial accumulator that tracks both via tachygrams.
 //! This enables more efficient proofs in the recursive (PCD) context.
 
-use ff::{Field, PrimeField};
+use ff::PrimeField;
 
 use crate::note::{NoteCommitment, Nullifier};
 use crate::primitives::Fp;
@@ -16,19 +16,9 @@ use crate::primitives::Fp;
 /// both are treated as field elements to be accumulated. This unified approach
 /// simplifies the proof system and enables efficient batch operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Tachygram(Fp);
+pub struct Tachygram(pub Fp);
 
 impl Tachygram {
-    /// Creates a new tachygram from a field element.
-    pub fn from_field(value: Fp) -> Self {
-        Self(value)
-    }
-
-    /// Returns the inner field element.
-    pub fn inner(&self) -> Fp {
-        self.0
-    }
-
     /// Returns the byte representation of this tachygram.
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0.to_repr()
@@ -42,32 +32,14 @@ impl Tachygram {
     }
 }
 
-impl From<Fp> for Tachygram {
-    fn from(value: Fp) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Tachygram> for Fp {
-    fn from(tachygram: Tachygram) -> Self {
-        tachygram.0
-    }
-}
-
 impl From<NoteCommitment> for Tachygram {
     fn from(commitment: NoteCommitment) -> Self {
-        Self(commitment.inner())
+        Self(commitment.0)
     }
 }
 
 impl From<Nullifier> for Tachygram {
     fn from(nullifier: Nullifier) -> Self {
-        Self(nullifier.inner())
-    }
-}
-
-impl Default for Tachygram {
-    fn default() -> Self {
-        Self(Fp::ZERO)
+        Self(nullifier.0)
     }
 }

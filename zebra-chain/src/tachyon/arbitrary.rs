@@ -4,15 +4,13 @@ use group::prime::PrimeCurveAffine;
 use halo2::pasta::pallas;
 use proptest::{arbitrary::any, prelude::*};
 use reddsa::Signature;
-use tachyon::primitives::Fp;
 
 use super::{
     accumulator::Anchor,
-    action::{AuthorizedTachyaction, Tachyaction},
+    action::Tachyaction,
     commitment::ValueCommitment,
-    nullifier::FlavoredNullifier,
     proof::AggregateProof,
-    shielded_data::AggregateData,
+    shielded_data::Tachystamp,
     tachygram::Tachygram,
 };
 
@@ -21,22 +19,8 @@ impl Arbitrary for Tachygram {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        any::<[u8; 32]>().prop_map(Tachygram::from_bytes).boxed()
-    }
-}
-
-impl Arbitrary for FlavoredNullifier {
-    type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-
-    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        (any::<u64>(), any::<u64>())
-            .prop_map(|(nf_val, epoch_val)| {
-                FlavoredNullifier::new(
-                    tachyon::Nullifier::from_field(Fp::from(nf_val)),
-                    tachyon::Epoch::new(epoch_val),
-                )
-            })
+        any::<u64>()
+            .prop_map(|val| Tachygram(pallas::Base::from(val)))
             .boxed()
     }
 }
@@ -65,30 +49,10 @@ impl Arbitrary for Tachyaction {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        (
-            any::<ValueCommitment>(),
-            any::<FlavoredNullifier>(),
-            any::<u64>(),
-            any::<[u8; 32]>(),
-        )
-            .prop_map(|(cv, nullifier, cm_x_val, rk_bytes)| Tachyaction {
+        (any::<ValueCommitment>(), any::<[u8; 32]>(), any::<[u8; 64]>())
+            .prop_map(|(cv, rk_bytes, sig_bytes)| Tachyaction {
                 cv,
-                nullifier,
-                cm_x: pallas::Base::from(cm_x_val),
                 rk: rk_bytes.into(),
-            })
-            .boxed()
-    }
-}
-
-impl Arbitrary for AuthorizedTachyaction {
-    type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-
-    fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        (any::<Tachyaction>(), any::<[u8; 64]>())
-            .prop_map(|(action, sig_bytes)| AuthorizedTachyaction {
-                action,
                 spend_auth_sig: Signature::from(sig_bytes),
             })
             .boxed()
@@ -106,7 +70,7 @@ impl Arbitrary for AggregateProof {
     }
 }
 
-impl Arbitrary for AggregateData {
+impl Arbitrary for Tachystamp {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 
@@ -116,7 +80,7 @@ impl Arbitrary for AggregateData {
             any::<AggregateProof>(),
             any::<Anchor>(),
         )
-            .prop_map(|(tachygrams, proof, anchor)| AggregateData::new(tachygrams, proof, anchor))
+            .prop_map(|(tachygrams, proof, anchor)| Tachystamp::new(tachygrams, proof, anchor))
             .boxed()
     }
 }
@@ -127,7 +91,7 @@ impl Arbitrary for Anchor {
 
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
         any::<u64>()
-            .prop_map(|val| Anchor::from_base(pallas::Base::from(val)))
+            .prop_map(|val| Anchor::from(pallas::Base::from(val)))
             .boxed()
     }
 }

@@ -7,10 +7,38 @@
 //! - **Oblivious Synchronization**: Wallets can outsource sync to untrusted services
 //! - **Polynomial Accumulators**: Unified tracking of commitments and nullifiers via tachygrams
 //!
-//! ## Status
+//! ## Type Structure
 //!
-//! This crate is currently a stub for progressive development. Types are
-//! placeholders and will be implemented as the protocol specification matures.
+//! ```text
+//! Bundle<A, V> (Tachyon Bundle)
+//! ├── value_balance: V
+//! ├── actions: Vec<Action<A::SpendAuth>>
+//! │   └── Action<SpendAuth>
+//! │       ├── cv: ValueCommitment
+//! │       ├── rk: RandomizedVerificationKey
+//! │       └── authorization: SpendAuth
+//! └── authorization: A
+//!     └── Autonome | Adjunct | Aggregate
+//! ```
+//!
+//! ## Authorization States
+//!
+//! Bundles use a type-state pattern to track authorization progress:
+//!
+//! - [`Unsigned`] - Bundle being constructed, no signatures yet
+//! - [`Autonome`] - Self-contained bundle with tachystamp (can stand alone)
+//! - [`Adjunct`] - Dependent bundle, no tachystamp (depends on aggregate)
+//! - [`Aggregate`] - Merged tachystamp covering adjunct bundles (may have own actions)
+//!
+//! ## Block Structure
+//!
+//! A block can contain a mix of:
+//! - `Bundle<Autonome, V>` - Standalone transactions with their own proof
+//! - `Bundle<Adjunct, V>` - Dependent transactions (proof in aggregate)
+//! - `Bundle<Aggregate, V>` - Aggregate transaction(s) covering adjunct bundles
+//!
+//! Multiple aggregates can exist in one block, each covering different bundles.
+//! Aggregates may also have their own actions (e.g., miner fee outputs).
 //!
 //! ## Nomenclature
 //!
@@ -27,7 +55,6 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
-pub mod accumulator;
 mod action;
 mod address;
 pub mod bundle;
@@ -37,13 +64,12 @@ pub mod primitives;
 pub mod tachygram;
 pub mod value;
 
-pub use accumulator::{Accumulator, AccumulatorRoot, MembershipWitness};
-pub use action::Action;
+pub use action::{Action, RandomizedVerificationKey, SpendAuthSignature, Unsigned};
 pub use address::Address;
-pub use bundle::Bundle;
-pub use keys::{
-    ConstrainedNullifierKey, FullViewingKey, IncomingViewingKey, NullifierKey, SpendingKey,
+pub use bundle::{
+    Adjunct, Aggregate, Authorization, Autonome, BindingSignature, Bundle, Proof, Tachystamp,
 };
+pub use keys::{FullViewingKey, IncomingViewingKey, NullifierKey, SpendingKey};
 pub use note::{Epoch, Note, NoteCommitment, Nullifier, NullifierTrapdoor};
 pub use tachygram::Tachygram;
 pub use value::ValueCommitment;
