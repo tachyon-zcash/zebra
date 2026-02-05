@@ -470,19 +470,24 @@ impl<T: reddsa::SigType> ZcashDeserialize for reddsa::Signature<T> {
 
 // Tachyon ShieldedData serialization
 //
-// Wire format (counts first):
+// Wire format (counts first, conditional fields):
 //
-// nTachygrams    : compactsize
+// nTachygrams    : compactsize (0 if stripped)
 // nActions       : compactsize
-// vTachygrams    : nTachygrams * 32 bytes  (if nTachygrams > 0)
-// proof          : size-prefixed bytes     (if nTachygrams > 0)
-// anchor         : 32 bytes                (if nTachygrams > 0)
-// vActions       : nActions * (cv:32 + rk:32 + sig:64 = 128 bytes)
-// valueBalance   : i64
-// bindingSig     : 64 bytes
+// vActions       : nActions × 128 bytes     (if nActions > 0)
+// valueBalance   : i64                      (if nActions > 0)
+// bindingSig     : 64 bytes                 (if nActions > 0)
+// anchor         : 32 bytes                 (if nTachygrams > 0)
+// vTachygrams    : nTachygrams × 32 bytes   (if nTachygrams > 0)
+// proof          : size-prefixed bytes      (if nTachygrams > 0)
 //
-// If nTachygrams == 0 AND nActions == 0: Option<ShieldedData> is None.
-// nTachygrams == 0 indicates a stripped transaction (tachystamp = None).
+// Bundle categories based on counts:
+// - None:      nTachygrams = 0, nActions = 0
+// - Adjunct:   nTachygrams = 0, nActions > 0 (stripped)
+// - Autonome:  nTachygrams = nActions > 0 (self-contained)
+// - Aggregate: nTachygrams > nActions (carries others' tachygrams)
+//   - Based:    nActions > 0 ("based" = coinbase, miner shielding rewards)
+//   - Innocent: nActions = 0 (only carries tachystamps)
 
 impl ZcashSerialize for Option<tachyon::ShieldedData> {
     fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
@@ -504,47 +509,38 @@ impl ZcashSerialize for tachyon::ShieldedData {
     fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
         use group::ff::PrimeField;
 
-        // nTachygrams (0 if stripped)
+        // Counts first
         let n_tachygrams = self
             .tachystamp
             .as_ref()
             .map(|s| s.tachygrams.len())
-            .unwrap_or(0);
-        let n_tachygrams_compact = CompactSizeMessage::try_from(n_tachygrams)?;
-        n_tachygrams_compact.zcash_serialize(&mut writer)?;
+            .unwrap_or(0); // 0 if stripped
+        CompactSizeMessage::try_from(n_tachygrams)?.zcash_serialize(&mut writer)?;
+        CompactSizeMessage::try_from(self.actions.len())?.zcash_serialize(&mut writer)?;
 
-        // nActions
-        let n_actions = CompactSizeMessage::try_from(self.actions.len())?;
-        n_actions.zcash_serialize(&mut writer)?;
-
-        // vTachygrams, proof, anchor (if tachystamp present)
-        if let Some(stamp) = &self.tachystamp {
-            for tg in &stamp.tachygrams {
-                writer.write_all(&tg.0.to_repr())?;
+        // Adjunct fields (conditional on nActions > 0)
+        if !self.actions.is_empty() {
+            for action in self.actions.iter() {
+                writer.write_all(&action.cv.to_bytes())?; // cv: 32 bytes
+                writer.write_all(&<[u8; 32]>::from(action.rk))?; // rk: 32 bytes
+                writer.write_all(&<[u8; 64]>::from(action.spend_auth_sig))?; // sig: 64 bytes
             }
-
-            // proof (size-prefixed)
-            zcash_serialize_bytes(&stamp.proof.as_bytes().to_vec(), &mut writer)?;
-
-            // anchor
-            writer.write_all(&stamp.anchor.0.to_repr())?;
+            self.value_balance.zcash_serialize(&mut writer)?;
+            // binding_sig must be Some when actions is non-empty
+            self.binding_sig
+                .as_ref()
+                .expect("binding_sig required when actions present")
+                .zcash_serialize(&mut writer)?;
         }
 
-        // vActions
-        for action in self.actions.iter() {
-            // cv: 32 bytes
-            writer.write_all(&action.cv.to_bytes())?;
-            // rk: 32 bytes
-            writer.write_all(&<[u8; 32]>::from(action.rk))?;
-            // spend_auth_sig: 64 bytes
-            writer.write_all(&<[u8; 64]>::from(action.spend_auth_sig))?;
+        // Tachystamp fields at end (stripped in adjuncts)
+        if let Some(stamp) = &self.tachystamp {
+            writer.write_all(&stamp.anchor.0.to_repr())?; // anchor: 32 bytes
+            for tg in &stamp.tachygrams {
+                writer.write_all(&tg.0.to_repr())?; // tachygram: 32 bytes each
+            }
+            zcash_serialize_bytes(&stamp.proof.as_bytes().to_vec(), &mut writer)?; // proof: size-prefixed
         }
-
-        // valueBalance: i64
-        self.value_balance.zcash_serialize(&mut writer)?;
-
-        // bindingSig: 64 bytes
-        self.binding_sig.zcash_serialize(&mut writer)?;
 
         Ok(())
     }
@@ -554,39 +550,45 @@ impl ZcashDeserialize for Option<tachyon::ShieldedData> {
     fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
         use group::{ff::PrimeField, GroupEncoding};
 
-        // nTachygrams
-        let n_tachygrams: CompactSizeMessage = (&mut reader).zcash_deserialize_into()?;
-        let n_tachygrams: usize = n_tachygrams.into();
+        // Counts first
+        let n_tachygrams: usize = (&mut reader).zcash_deserialize_into::<CompactSizeMessage>()?.into();
+        let n_actions: usize = (&mut reader).zcash_deserialize_into::<CompactSizeMessage>()?.into();
 
-        // nActions
-        let n_actions: CompactSizeMessage = (&mut reader).zcash_deserialize_into()?;
-        let n_actions: usize = n_actions.into();
-
-        // If both are empty, no ShieldedData
         if n_tachygrams == 0 && n_actions == 0 {
             return Ok(None);
         }
 
-        // vTachygrams, proof, anchor (if nTachygrams > 0)
-        let tachystamp = if n_tachygrams > 0 {
-            let mut tachygrams = Vec::with_capacity(n_tachygrams);
-            for _ in 0..n_tachygrams {
-                let bytes: [u8; 32] = reader.read_32_bytes()?;
-                let elem = pallas::Base::from_repr(bytes);
-                if elem.is_none().into() {
-                    return Err(SerializationError::Parse(
-                        "Invalid pallas::Base in tachygram",
-                    ));
+        // Adjunct fields (conditional on nActions > 0)
+        let (actions, value_balance, binding_sig) = if n_actions > 0 {
+            let mut actions = Vec::with_capacity(n_actions);
+            for _ in 0..n_actions {
+                let cv_bytes: [u8; 32] = reader.read_32_bytes()?;
+                let cv_point = pallas::Affine::from_bytes(&cv_bytes);
+                if cv_point.is_none().into() {
+                    return Err(SerializationError::Parse("Invalid pallas::Affine in action cv"));
                 }
-                tachygrams.push(tachyon::Tachygram(elem.unwrap()));
+                let cv = tachyon::ValueCommitment(cv_point.unwrap());
+
+                let rk_bytes: [u8; 32] = reader.read_32_bytes()?;
+                let rk: reddsa::VerificationKeyBytes<SpendAuth> = rk_bytes.into();
+
+                let spend_auth_sig: Signature<SpendAuth> = (&mut reader).zcash_deserialize_into()?;
+
+                actions.push(tachyon::Tachyaction { cv, rk, spend_auth_sig });
             }
 
-            // proof (size-prefixed)
-            let proof_bytes: Vec<u8> = (&mut reader).zcash_deserialize_into()?;
-            let proof = tachyon::Proof::new(proof_bytes)
-                .map_err(|_| SerializationError::Parse("Proof too large"))?;
+            let value_balance: amount::Amount = (&mut reader).zcash_deserialize_into()?;
+            let binding_sig: Signature<Binding> = (&mut reader).zcash_deserialize_into()?;
 
-            // anchor
+            (actions, value_balance, Some(binding_sig))
+        } else {
+            // Pure aggregate: no actions, no value flow, no binding sig
+            (Vec::new(), amount::Amount::zero(), None)
+        };
+
+        // Tachystamp fields at end (if present)
+        let tachystamp = if n_tachygrams > 0 {
+            // anchor: 32 bytes
             let anchor_bytes: [u8; 32] = reader.read_32_bytes()?;
             let anchor_elem = pallas::Base::from_repr(anchor_bytes);
             if anchor_elem.is_none().into() {
@@ -594,49 +596,30 @@ impl ZcashDeserialize for Option<tachyon::ShieldedData> {
             }
             let anchor = tachyon::accumulator::Epoch(anchor_elem.unwrap());
 
+            // vTachygrams: n × 32 bytes
+            let mut tachygrams = Vec::with_capacity(n_tachygrams);
+            for _ in 0..n_tachygrams {
+                let bytes: [u8; 32] = reader.read_32_bytes()?;
+                let elem = pallas::Base::from_repr(bytes);
+                if elem.is_none().into() {
+                    return Err(SerializationError::Parse("Invalid pallas::Base in tachygram"));
+                }
+                tachygrams.push(tachyon::Tachygram(elem.unwrap()));
+            }
+
+            // proof: size-prefixed
+            let proof_bytes: Vec<u8> = (&mut reader).zcash_deserialize_into()?;
+            let proof = tachyon::Proof::new(proof_bytes)
+                .map_err(|_| SerializationError::Parse("Proof too large"))?;
+
             Some(tachyon::Tachystamp::new(tachygrams, proof, anchor))
         } else {
             None
         };
 
-        // vActions
-        let mut actions = Vec::with_capacity(n_actions);
-        for _ in 0..n_actions {
-            // cv: 32 bytes
-            let cv_bytes: [u8; 32] = reader.read_32_bytes()?;
-            let cv_point = pallas::Affine::from_bytes(&cv_bytes);
-            if cv_point.is_none().into() {
-                return Err(SerializationError::Parse(
-                    "Invalid pallas::Affine in action cv",
-                ));
-            }
-            let cv = tachyon::ValueCommitment(cv_point.unwrap());
-
-            // rk: 32 bytes
-            let rk_bytes: [u8; 32] = reader.read_32_bytes()?;
-            let rk: reddsa::VerificationKeyBytes<SpendAuth> = rk_bytes.into();
-
-            // spend_auth_sig: 64 bytes
-            let spend_auth_sig: Signature<SpendAuth> = (&mut reader).zcash_deserialize_into()?;
-
-            actions.push(tachyon::Tachyaction {
-                cv,
-                rk,
-                spend_auth_sig,
-            });
-        }
-
-        let actions: AtLeastOne<tachyon::Tachyaction> = actions.try_into()?;
-
-        // valueBalance: i64
-        let value_balance: amount::Amount = (&mut reader).zcash_deserialize_into()?;
-
-        // bindingSig: 64 bytes
-        let binding_sig: Signature<Binding> = (&mut reader).zcash_deserialize_into()?;
-
         Ok(Some(tachyon::ShieldedData {
-            value_balance,
             actions,
+            value_balance,
             binding_sig,
             tachystamp,
         }))
