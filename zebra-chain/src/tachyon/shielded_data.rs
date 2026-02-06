@@ -1,0 +1,313 @@
+//! Tachyon shielded data for transactions.
+//!
+//! This module defines two types for Tachyon transactions:
+//!
+//! - [`ShieldedData`] - Stripped tachyon transaction data (signatures only, as appears in blocks)
+//! - [`AggregateData`] - Aggregate transaction data containing all tachygrams and merged proof
+//!
+//! ## Aggregate Transaction Model
+//!
+//! Tachyon uses an aggregate proof model:
+//!
+//! 1. Users broadcast full transactions (tachygrams, proof, anchor, signatures)
+//! 2. Aggregators collect transactions and merge proofs
+//! 3. In blocks, individual transactions are **stripped** (signatures only)
+//! 4. The aggregate transaction contains all tachygrams and the merged proof
+//!
+//! The relationship between aggregate and individual transactions is implicit
+//! through the tachygrams - no explicit linkage fields are needed.
+
+use std::fmt;
+
+use bitflags::bitflags;
+use group::ff::PrimeField;
+use halo2::pasta::pallas;
+use reddsa::{orchard::Binding, Signature};
+
+use crate::{
+    amount::{Amount, NegativeAllowed},
+    serialization::{AtLeastOne, TrustedPreallocate},
+};
+
+use super::{
+    accumulator,
+    action::{AuthorizedTachyaction, Tachyaction},
+    commitment::ValueCommitment,
+    nullifier::FlavoredNullifier,
+    proof::AggregateProof,
+    tachygram::Tachygram,
+};
+
+bitflags! {
+    /// Flags for Tachyon transactions.
+    ///
+    /// Similar to Orchard flags, these control which operations are enabled.
+    ///
+    /// In a Tachyon transaction, the reserved bits 2..7 of the flagsTachyon
+    /// field MUST be zero.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub struct Flags: u8 {
+        /// Enable spending non-zero valued notes (requires at least one spend).
+        const ENABLE_SPENDS = 0b0000_0001;
+        /// Enable creating new non-zero valued notes (requires at least one output).
+        const ENABLE_OUTPUTS = 0b0000_0010;
+        // Bits 2..7 are reserved and must be zero.
+    }
+}
+
+// Manual serde implementation using bitflags_serde_legacy for compatibility
+impl serde::Serialize for Flags {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        bitflags_serde_legacy::serialize(self, "Flags", serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Flags {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        bitflags_serde_legacy::deserialize("Flags", deserializer)
+    }
+}
+
+impl Flags {
+    /// Check if spends are enabled.
+    pub fn spends_enabled(&self) -> bool {
+        self.contains(Self::ENABLE_SPENDS)
+    }
+
+    /// Check if outputs are enabled.
+    pub fn outputs_enabled(&self) -> bool {
+        self.contains(Self::ENABLE_OUTPUTS)
+    }
+}
+
+impl Default for Flags {
+    fn default() -> Self {
+        Self::ENABLE_SPENDS | Self::ENABLE_OUTPUTS
+    }
+}
+
+/// Tachyon shielded data bundle for a transaction (as it appears in a block).
+///
+/// This is the **stripped** form of a tachyon transaction after aggregation.
+/// It contains only the signatures and value balance - the tachygrams, proof,
+/// and anchor have been moved to the [`AggregateData`].
+///
+/// When broadcast, transactions contain additional fields (tachygrams, proof,
+/// anchor) that are stripped out during aggregation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ShieldedData {
+    /// Transaction flags (enable spends/outputs).
+    pub flags: Flags,
+
+    /// Net value of Tachyon spends minus outputs.
+    ///
+    /// Positive means value flows out of Tachyon pool (deshielding).
+    /// Negative means value flows into Tachyon pool (shielding).
+    pub value_balance: Amount<NegativeAllowed>,
+
+    /// The authorized tachyactions (signatures only in block form).
+    ///
+    /// Each action represents a spend and/or output with its authorization
+    /// signature. The tachygrams from these actions are in the aggregate.
+    pub actions: AtLeastOne<AuthorizedTachyaction>,
+
+    /// Binding signature on transaction sighash.
+    ///
+    /// This proves that the value commitments in actions sum to the
+    /// declared value_balance without revealing actual amounts.
+    pub binding_sig: Signature<Binding>,
+}
+
+/// Aggregate transaction data containing the merged proof and all tachygrams.
+///
+/// This type is used in "aggregate transactions" that bundle:
+/// - All tachygrams (nullifiers and note commitments) from aggregated transactions
+/// - A single merged Ragu proof covering all operations
+/// - The accumulator anchor
+///
+/// The relationship between this aggregate and the individual stripped
+/// transactions is implicit through the tachygrams themselves.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AggregateData {
+    /// All tachygrams from the aggregated transactions.
+    ///
+    /// These are the nullifiers and note commitments that get recorded
+    /// in the polynomial accumulator.
+    pub tachygrams: Vec<Tachygram>,
+
+    /// The aggregated Ragu proof covering all operations.
+    pub proof: AggregateProof,
+
+    /// Recent accumulator anchor.
+    ///
+    /// All spends in the aggregated transactions reference notes
+    /// committed at or before this accumulator state.
+    pub anchor: accumulator::Anchor,
+}
+
+impl AggregateData {
+    /// Create a new aggregate data.
+    pub fn new(
+        tachygrams: Vec<Tachygram>,
+        proof: AggregateProof,
+        anchor: accumulator::Anchor,
+    ) -> Self {
+        Self {
+            tachygrams,
+            proof,
+            anchor,
+        }
+    }
+
+    /// Create an empty aggregate (for testing purposes).
+    pub fn empty() -> Self {
+        Self {
+            tachygrams: Vec::new(),
+            proof: AggregateProof::empty(),
+            anchor: accumulator::Anchor::default(),
+        }
+    }
+
+    /// Get the number of tachygrams in this aggregate.
+    pub fn tachygram_count(&self) -> usize {
+        self.tachygrams.len()
+    }
+}
+
+impl fmt::Display for ShieldedData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("tachyon::ShieldedData")
+            .field("actions", &self.actions.len())
+            .field("value_balance", &self.value_balance)
+            .field("flags", &self.flags)
+            .finish()
+    }
+}
+
+impl fmt::Display for AggregateData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("tachyon::AggregateData")
+            .field("tachygrams", &self.tachygrams.len())
+            .field("proof_size", &self.proof.size())
+            .finish()
+    }
+}
+
+impl ShieldedData {
+    /// Iterate over the actions in this bundle.
+    pub fn actions(&self) -> impl Iterator<Item = &Tachyaction> {
+        self.actions.iter().map(|aa| &aa.action)
+    }
+
+    /// Collect the nullifiers from this bundle.
+    pub fn nullifiers(&self) -> impl Iterator<Item = &FlavoredNullifier> {
+        self.actions().map(|action| &action.nullifier)
+    }
+
+    /// Collect the note commitment x-coordinates from this bundle.
+    pub fn note_commitments(&self) -> impl Iterator<Item = &pallas::Base> {
+        self.actions().map(|action| &action.cm_x)
+    }
+
+    /// Generate tachygrams for all nullifiers and commitments in this bundle.
+    ///
+    /// Returns an iterator of tachygrams in order: all nullifiers first,
+    /// then all note commitments. This ordering is important for the
+    /// Tachyon accumulator.
+    pub fn tachygrams(&self) -> impl Iterator<Item = Tachygram> + '_ {
+        // Nullifiers as tachygrams (extract the nullifier from FlavoredNullifier)
+        let nullifier_tachygrams = self
+            .nullifiers()
+            .map(|fnf| Tachygram::from_nullifier(&fnf.nullifier()));
+
+        // Note commitments as tachygrams
+        let commitment_tachygrams = self.note_commitments().map(|cm_x| {
+            let bytes = cm_x.to_repr();
+            Tachygram::from_bytes(bytes)
+        });
+
+        nullifier_tachygrams.chain(commitment_tachygrams)
+    }
+
+    /// Get the value balance of this bundle.
+    pub fn value_balance(&self) -> Amount<NegativeAllowed> {
+        self.value_balance
+    }
+
+    /// Calculate the binding verification key.
+    ///
+    /// This is used to verify the binding signature. The key is derived from
+    /// the value commitments in actions and the balancing value.
+    pub fn binding_verification_key(&self) -> reddsa::VerificationKeyBytes<Binding> {
+        let cv: ValueCommitment = self.actions().map(|action| action.cv).sum();
+        let cv_balance = ValueCommitment::new(pallas::Scalar::zero(), self.value_balance);
+
+        let key_bytes: [u8; 32] = (cv - cv_balance).into();
+        key_bytes.into()
+    }
+
+    /// Count the number of actions in this bundle.
+    pub fn actions_count(&self) -> usize {
+        self.actions.len()
+    }
+}
+
+impl AtLeastOne<AuthorizedTachyaction> {
+    /// Iterate over the actions.
+    pub fn actions(&self) -> impl Iterator<Item = &Tachyaction> {
+        self.iter().map(|aa| &aa.action)
+    }
+}
+
+// TrustedPreallocate implementation for bounded deserialization
+impl TrustedPreallocate for AuthorizedTachyaction {
+    fn max_allocation() -> u64 {
+        // Same logic as Orchard: limit based on max block size
+        // Each action is ~196 bytes, max block is ~2MB
+        const MAX: u64 = (2_000_000 / AuthorizedTachyaction::SIZE as u64) + 1;
+        MAX
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn flags_default() {
+        let _init_guard = zebra_test::init();
+
+        let flags = Flags::default();
+        assert!(flags.spends_enabled());
+        assert!(flags.outputs_enabled());
+    }
+
+    #[test]
+    fn flags_individual() {
+        let _init_guard = zebra_test::init();
+
+        let spend_only = Flags::ENABLE_SPENDS;
+        assert!(spend_only.spends_enabled());
+        assert!(!spend_only.outputs_enabled());
+
+        let output_only = Flags::ENABLE_OUTPUTS;
+        assert!(!output_only.spends_enabled());
+        assert!(output_only.outputs_enabled());
+    }
+
+    #[test]
+    fn aggregate_data_tachygrams() {
+        let _init_guard = zebra_test::init();
+
+        let tg1 = Tachygram::from_bytes([1u8; 32]);
+        let tg2 = Tachygram::from_bytes([2u8; 32]);
+
+        let aggregate = AggregateData::new(
+            vec![tg1, tg2],
+            AggregateProof::empty(),
+            accumulator::Anchor::default(),
+        );
+
+        assert_eq!(aggregate.tachygram_count(), 2);
+    }
+}
