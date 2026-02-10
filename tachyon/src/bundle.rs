@@ -1,399 +1,237 @@
-//! Tachyon transaction bundles and authorization traits.
+//! Tachyon transaction bundles and aggregation.
 //!
-//! This module defines the bundle types for Tachyon transactions:
+//! Three bundle types model tachystamp disposition, all parameterized
+//! by `N` (the number of tachygrams):
 //!
-//! - [`Bundle`] - The main bundle type containing actions and authorization
-//! - [`Authorization`] - Trait for tracking bundle authorization state
+//! - [`Autonome<N>`] - N actions, N tachygrams, self-contained
+//! - [`Adjunct<N>`] - N actions, stamp stripped
+//! - [`Aggregate<N>`] - <N actions, N tachygrams, merged stamp
 //!
-//! ## Authorization States
-//!
-//! Bundles progress through authorization states using type-state pattern:
-//!
-//! - [`Unsigned`] - Actions created but not signed
-//! - [`Autonome`] - Self-contained: signed with tachystamp (can stand alone)
-//! - [`Adjunct`] - Dependent: signed but tachystamp removed (depends on aggregate)
-//! - [`Aggregate`] - Merged tachystamp covering multiple adjunct bundles
+//! Actions are constant through state transitions; only the stamp
+//! (tachygrams, proof, epoch) is stripped or merged.
 //!
 //! ## Block Structure
 //!
-//! A block can contain:
-//! - `Bundle<Autonome, V>` - Standalone transactions with their own proof
-//! - `Bundle<Adjunct, V>` - Dependent transactions (proof in aggregate)
-//! - `Bundle<Aggregate, V>` - Aggregate transaction(s) covering adjunct bundles
-//!
+//! A block can contain a mix of autonome, adjunct, and aggregate bundles.
 //! Multiple aggregates can exist in one block, each covering a different set of
 //! adjunct bundles.
 
-use std::fmt;
-use std::vec::Vec;
-
-use crate::action::{Action, SpendAuthSignature, Unsigned};
-use crate::primitives::redpallas;
-use crate::tachystamp::Tachystamp;
+use crate::action::Action;
+use crate::primitives::{Binding, Signature};
+use crate::stamp::Stamp;
+use crate::value::ValueCommitment;
 
 /// A binding signature for value balance verification (RedPallas).
-pub type BindingSignature = redpallas::Signature<redpallas::Binding>;
+pub type BindingSignature = Signature<Binding>;
 
 // =============================================================================
-// Authorization trait and states
+// Bundle trait
 // =============================================================================
 
-/// Marker trait for bundle authorization states.
+/// Shared behavior across all bundle aggregation states.
 ///
-/// This trait enables type-state pattern for tracking bundle progress
-/// through the signing and aggregation workflow.
+/// ## Implementors
 ///
-/// ## States
-///
-/// - [`Unsigned`] - Bundle being constructed, no signatures
-/// - [`Autonome`] - Self-contained bundle with signatures and tachystamp
-/// - [`Adjunct`] - Dependent bundle with signatures but no tachystamp
-/// - [`Aggregate`] - Merged tachystamp covering adjunct bundles
-pub trait Authorization: fmt::Debug {
-    /// The type of authorization data stored in each action.
-    type SpendAuth: fmt::Debug;
+/// - [`Autonome`] - Self-contained bundle with stamp
+/// - [`Adjunct`] - Dependent bundle, stamp stripped
+/// - [`Aggregate`] - Merged stamp covering adjunct bundles
+pub trait Bundle {
+    /// Returns the actions in this bundle.
+    fn actions(&self) -> &[Action];
+
+    /// Returns the value balance.
+    fn value_balance(&self) -> &ValueCommitment;
+
+    /// Returns the binding signature.
+    fn binding_sig(&self) -> &BindingSignature;
 }
 
-/// Authorization state for unsigned bundles.
-///
-/// Used during bundle construction before signatures are applied.
-impl Authorization for Unsigned {
-    type SpendAuth = Unsigned;
-}
+// =============================================================================
+// Autonome
+// =============================================================================
 
-/// Authorization state for self-contained bundles.
+/// Self-contained bundle: N actions with N tachygrams.
 ///
 /// An autonome bundle has everything needed to validate independently:
-/// - Signed actions with spend authorization signatures
+/// - N actions with spend authorization signatures
 /// - Binding signature
-/// - Tachystamp (tachygrams, proof, anchor)
+/// - Stamp with N tachygrams, N-input proof, and anchor
 ///
 /// Autonome bundles can appear directly in blocks without an aggregate.
-#[derive(Clone, Debug)]
-pub struct Autonome {
+#[derive(Clone)]
+pub struct Autonome<const N: usize> {
+    /// N tachyactions (cv, rk, sig).
+    actions: [Action; N],
+
+    /// Net value of spends minus outputs.
+    value_balance: ValueCommitment,
+
     /// Binding signature on transaction sighash.
     binding_sig: BindingSignature,
 
-    /// The tachystamp containing proof, tachygrams, and anchor.
-    tachystamp: Tachystamp,
+    /// The stamp (N tachygrams, N-input proof, anchor).
+    stamp: Stamp<N>,
 }
 
-impl Autonome {
-    /// Creates a new autonome authorization state.
-    pub fn new(binding_sig: BindingSignature, tachystamp: Tachystamp) -> Self {
-        Self {
-            binding_sig,
-            tachystamp,
-        }
-    }
-
-    /// Returns the binding signature.
-    pub fn binding_sig(&self) -> &BindingSignature {
-        &self.binding_sig
-    }
-
-    /// Returns the tachystamp.
-    pub fn tachystamp(&self) -> &Tachystamp {
-        &self.tachystamp
-    }
-}
-
-impl Authorization for Autonome {
-    type SpendAuth = SpendAuthSignature;
-}
-
-/// Authorization state for adjunct (dependent) bundles.
-///
-/// An adjunct bundle has been stripped of its tachystamp, which was
-/// contributed to an [`Aggregate`]. It contains:
-/// - Signed actions with spend authorization signatures
-/// - Binding signature
-/// - NO tachystamp (covered by aggregate)
-///
-/// Adjunct bundles require a corresponding aggregate in the same block.
-#[derive(Clone, Debug)]
-pub struct Adjunct {
-    /// Binding signature on transaction sighash.
-    binding_sig: BindingSignature,
-}
-
-impl Adjunct {
-    /// Creates a new adjunct authorization state.
-    pub fn new(binding_sig: BindingSignature) -> Self {
-        Self { binding_sig }
-    }
-
-    /// Returns the binding signature.
-    pub fn binding_sig(&self) -> &BindingSignature {
-        &self.binding_sig
-    }
-}
-
-impl Authorization for Adjunct {
-    type SpendAuth = SpendAuthSignature;
-}
-
-/// Authorization state for aggregate bundles.
-///
-/// An aggregate bundle contains merged proof data covering multiple
-/// [`Adjunct`] bundles:
-/// - Merged tachystamp (combined tachygrams, aggregated proof, anchor)
-/// - Binding signature
-/// - Optional actions (e.g., miner fee outputs to Tachyon)
-///
-/// Multiple aggregates can exist in a single block, each covering a
-/// different set of adjunct bundles.
-#[derive(Clone, Debug)]
-pub struct Aggregate {
-    /// Binding signature on transaction sighash.
-    binding_sig: BindingSignature,
-
-    /// The merged tachystamp covering multiple adjunct bundles.
-    tachystamp: Tachystamp,
-}
-
-impl Aggregate {
-    /// Creates a new aggregate authorization state.
-    pub fn new(binding_sig: BindingSignature, tachystamp: Tachystamp) -> Self {
-        Self {
-            binding_sig,
-            tachystamp,
-        }
-    }
-
-    /// Returns the binding signature.
-    pub fn binding_sig(&self) -> &BindingSignature {
-        &self.binding_sig
-    }
-
-    /// Returns the merged tachystamp.
-    pub fn tachystamp(&self) -> &Tachystamp {
-        &self.tachystamp
-    }
-}
-
-impl Authorization for Aggregate {
-    type SpendAuth = SpendAuthSignature;
-}
-
-// =============================================================================
-// Bundle type
-// =============================================================================
-
-/// A bundle of Tachyon [`Action`] descriptions and authorization data.
-///
-/// This is the main Tachyon bundle type, analogous to Orchard's bundle.
-///
-/// ## Type Parameters
-///
-/// - `A`: The authorization state ([`Unsigned`], [`Autonome`], [`Adjunct`], [`Aggregate`])
-/// - `V`: The value balance type (e.g., `i64` or a currency-specific type)
-///
-/// ## Authorization Workflow
-///
-/// ```text
-/// Bundle<Unsigned, V>  ──sign()──►  Bundle<Autonome, V>  ──adjoin()──►  Bundle<Adjunct, V>
-///                                          │                                     │
-///                                          ▼                                     ▼
-///                                   (valid in block)                  (needs Bundle<Aggregate, V>)
-/// ```
-///
-/// ## Note
-///
-/// Unlike Orchard, Tachyon does not have a `flags` field. Tachyon's unified
-/// action model makes the spend/output distinction unnecessary at the protocol level.
-#[derive(Clone, Debug)]
-pub struct Bundle<A: Authorization, V> {
-    /// Net value of Tachyon spends minus outputs.
-    ///
-    /// Positive means value flows out of Tachyon pool (deshielding).
-    /// Negative means value flows into Tachyon pool (shielding).
-    value_balance: V,
-
-    /// The tachyactions (cv, rk, and authorization for each).
-    ///
-    /// Each action represents a spend and/or output operation.
-    actions: Vec<Action<A::SpendAuth>>,
-
-    /// Bundle-level authorization data.
-    authorization: A,
-}
-
-// -----------------------------------------------------------------------------
-// Unsigned bundle
-// -----------------------------------------------------------------------------
-
-impl<V> Bundle<Unsigned, V> {
-    /// Creates a new unsigned bundle.
-    pub fn new(value_balance: V, actions: Vec<Action<Unsigned>>) -> Self {
-        Self {
-            value_balance,
-            actions,
-            authorization: Unsigned,
-        }
-    }
-
-    /// Signs this bundle to produce an autonome (self-contained) bundle.
-    ///
-    /// # Arguments
-    ///
-    /// * `sign_action` - Function to sign each action, given its index
-    /// * `binding_sig` - The binding signature for the bundle
-    /// * `tachystamp` - The tachystamp (tachygrams, proof, anchor)
-    pub fn sign<E>(
-        self,
-        mut sign_action: impl FnMut(usize, Action<Unsigned>) -> Result<Action<SpendAuthSignature>, E>,
+impl<const N: usize> Autonome<N> {
+    /// Creates a new autonome bundle.
+    pub fn new(
+        actions: [Action; N],
+        value_balance: ValueCommitment,
         binding_sig: BindingSignature,
-        tachystamp: Tachystamp,
-    ) -> Result<Bundle<Autonome, V>, E> {
-        let actions = self
-            .actions
-            .into_iter()
-            .enumerate()
-            .map(|(i, action)| sign_action(i, action))
-            .collect::<Result<Vec<_>, E>>()?;
-
-        Ok(Bundle {
-            value_balance: self.value_balance,
-            actions,
-            authorization: Autonome::new(binding_sig, tachystamp),
-        })
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Autonome bundle
-// -----------------------------------------------------------------------------
-
-impl<V> Bundle<Autonome, V> {
-    /// Creates a new autonome bundle directly.
-    ///
-    /// This is primarily for deserialization; prefer using
-    /// [`Bundle::new`] and [`Bundle::sign`] for construction.
-    pub fn from_parts(
-        value_balance: V,
-        actions: Vec<Action<SpendAuthSignature>>,
-        binding_sig: BindingSignature,
-        tachystamp: Tachystamp,
+        stamp: Stamp<N>,
     ) -> Self {
         Self {
-            value_balance,
             actions,
-            authorization: Autonome::new(binding_sig, tachystamp),
+            value_balance,
+            binding_sig,
+            stamp,
         }
     }
 
-    /// Returns the binding signature.
-    pub fn binding_sig(&self) -> &BindingSignature {
-        self.authorization.binding_sig()
+    /// Returns the stamp.
+    pub fn stamp(&self) -> &Stamp<N> {
+        &self.stamp
     }
 
-    /// Returns the tachystamp.
-    pub fn tachystamp(&self) -> &Tachystamp {
-        self.authorization.tachystamp()
-    }
-
-    /// Converts this bundle to an adjunct by removing its tachystamp.
+    /// Strips the stamp, producing an adjunct and the extracted stamp.
     ///
-    /// The tachystamp should be contributed to an [`Aggregate`].
-    /// Returns the adjunct bundle and the extracted tachystamp.
-    pub fn adjoin(self) -> (Bundle<Adjunct, V>, Tachystamp) {
-        let tachystamp = self.authorization.tachystamp;
-        let binding_sig = self.authorization.binding_sig;
-
-        let bundle = Bundle {
-            value_balance: self.value_balance,
+    /// The stamp should be merged into an [`Aggregate`].
+    pub fn strip(self) -> (Adjunct<N>, Stamp<N>) {
+        let adjunct = Adjunct {
             actions: self.actions,
-            authorization: Adjunct::new(binding_sig),
+            value_balance: self.value_balance,
+            binding_sig: self.binding_sig,
         };
-
-        (bundle, tachystamp)
+        (adjunct, self.stamp)
     }
 }
 
-// -----------------------------------------------------------------------------
-// Adjunct bundle
-// -----------------------------------------------------------------------------
-
-impl<V> Bundle<Adjunct, V> {
-    /// Creates a new adjunct bundle directly.
-    ///
-    /// This is primarily for deserialization.
-    pub fn from_parts(
-        value_balance: V,
-        actions: Vec<Action<SpendAuthSignature>>,
-        binding_sig: BindingSignature,
-    ) -> Self {
-        Self {
-            value_balance,
-            actions,
-            authorization: Adjunct::new(binding_sig),
-        }
-    }
-
-    /// Returns the binding signature.
-    pub fn binding_sig(&self) -> &BindingSignature {
-        self.authorization.binding_sig()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Aggregate bundle
-// -----------------------------------------------------------------------------
-
-impl<V> Bundle<Aggregate, V> {
-    /// Creates a new aggregate bundle.
-    ///
-    /// An aggregate bundle contains:
-    /// - Merged tachystamp covering adjunct bundles
-    /// - Optional actions (e.g., miner fee outputs)
-    /// - Its own value balance and binding signature
-    pub fn from_parts(
-        value_balance: V,
-        actions: Vec<Action<SpendAuthSignature>>,
-        binding_sig: BindingSignature,
-        tachystamp: Tachystamp,
-    ) -> Self {
-        Self {
-            value_balance,
-            actions,
-            authorization: Aggregate::new(binding_sig, tachystamp),
-        }
-    }
-
-    /// Returns the binding signature.
-    pub fn binding_sig(&self) -> &BindingSignature {
-        self.authorization.binding_sig()
-    }
-
-    /// Returns the merged tachystamp.
-    pub fn tachystamp(&self) -> &Tachystamp {
-        self.authorization.tachystamp()
-    }
-}
-
-// -----------------------------------------------------------------------------
-// Common methods
-// -----------------------------------------------------------------------------
-
-impl<A: Authorization, V> Bundle<A, V> {
-    /// Returns the actions in this bundle.
-    pub fn actions(&self) -> &[Action<A::SpendAuth>] {
+impl<const N: usize> Bundle for Autonome<N> {
+    fn actions(&self) -> &[Action] {
         &self.actions
     }
 
-    /// Returns the value balance of this bundle.
-    pub fn value_balance(&self) -> &V {
+    fn value_balance(&self) -> &ValueCommitment {
         &self.value_balance
     }
 
-    /// Returns the authorization data.
-    pub fn authorization(&self) -> &A {
-        &self.authorization
+    fn binding_sig(&self) -> &BindingSignature {
+        &self.binding_sig
+    }
+}
+
+// =============================================================================
+// Adjunct
+// =============================================================================
+
+/// Dependent bundle: N actions, stamp stripped.
+///
+/// An adjunct bundle retains its N actions and binding signature but has
+/// no stamp — it was contributed to an [`Aggregate`].
+///
+/// Adjunct bundles require a corresponding aggregate in the same block.
+#[derive(Clone)]
+pub struct Adjunct<const N: usize> {
+    /// N tachyactions (cv, rk, sig).
+    actions: [Action; N],
+
+    /// Net value of spends minus outputs.
+    value_balance: ValueCommitment,
+
+    /// Binding signature on transaction sighash.
+    binding_sig: BindingSignature,
+}
+
+impl<const N: usize> Adjunct<N> {
+    /// Creates a new adjunct bundle.
+    pub fn new(
+        actions: [Action; N],
+        value_balance: ValueCommitment,
+        binding_sig: BindingSignature,
+    ) -> Self {
+        Self {
+            actions,
+            value_balance,
+            binding_sig,
+        }
+    }
+}
+
+impl<const N: usize> Bundle for Adjunct<N> {
+    fn actions(&self) -> &[Action] {
+        &self.actions
     }
 
-    /// Returns the number of actions in this bundle.
-    pub fn actions_count(&self) -> usize {
-        self.actions.len()
+    fn value_balance(&self) -> &ValueCommitment {
+        &self.value_balance
+    }
+
+    fn binding_sig(&self) -> &BindingSignature {
+        &self.binding_sig
+    }
+}
+
+// =============================================================================
+// Aggregate
+// =============================================================================
+
+/// Merged stamp covering multiple adjunct bundles: N tachygrams, <N actions.
+///
+/// An aggregate bundle contains:
+/// - Merged stamp with N tachygrams, N-input proof, and anchor
+/// - Binding signature
+/// - Any number of actions below N (0 = innocent, >0 = based)
+///
+/// Multiple aggregates can exist in a single block, each covering a
+/// different set of adjunct bundles.
+#[derive(Clone)]
+pub struct Aggregate<const N: usize> {
+    /// Tachyactions (cv, rk, sig). len() < N. May be empty (innocent aggregate).
+    actions: Vec<Action>,
+
+    /// Net value of spends minus outputs.
+    value_balance: ValueCommitment,
+
+    /// Binding signature on transaction sighash.
+    binding_sig: BindingSignature,
+
+    /// The merged stamp (N tachygrams, N-input proof, anchor).
+    stamp: Stamp<N>,
+}
+
+impl<const N: usize> Aggregate<N> {
+    /// Creates a new aggregate bundle.
+    pub fn new(
+        actions: Vec<Action>,
+        value_balance: ValueCommitment,
+        binding_sig: BindingSignature,
+        stamp: Stamp<N>,
+    ) -> Self {
+        Self {
+            actions,
+            value_balance,
+            binding_sig,
+            stamp,
+        }
+    }
+
+    /// Returns the merged stamp.
+    pub fn stamp(&self) -> &Stamp<N> {
+        &self.stamp
+    }
+}
+
+impl<const N: usize> Bundle for Aggregate<N> {
+    fn actions(&self) -> &[Action] {
+        &self.actions
+    }
+
+    fn value_balance(&self) -> &ValueCommitment {
+        &self.value_balance
+    }
+
+    fn binding_sig(&self) -> &BindingSignature {
+        &self.binding_sig
     }
 }

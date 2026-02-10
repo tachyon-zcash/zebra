@@ -5019,6 +5019,7 @@ dependencies = [
 name = "tachyon"
 version = "0.0.0"
 dependencies = [
+ "bitvec",
  "core2",
  "ff",
  "group",
@@ -5027,6 +5028,7 @@ dependencies = [
  "rand 0.8.5",
  "reddsa",
  "serde",
+ "sinsemilla",
 ]
 
 [[package]]

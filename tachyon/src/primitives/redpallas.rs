@@ -1,15 +1,11 @@
 //! A minimal RedPallas implementation for use in Zcash.
 
 use core::cmp::{Ord, Ordering, PartialOrd};
-
 use pasta_curves::pallas;
 use rand::{CryptoRng, RngCore};
 
 #[cfg(feature = "std")]
 pub use reddsa::batch;
-
-#[cfg(test)]
-use rand::rngs::OsRng;
 
 /// A RedPallas signature type.
 pub trait SigType: reddsa::SigType + private::Sealed {}
@@ -113,12 +109,6 @@ impl<T: SigType> Ord for VerificationKey<T> {
 }
 
 impl VerificationKey<SpendAuth> {
-    /// Used in the note encryption tests.
-    #[cfg(test)]
-    pub(crate) fn dummy() -> Self {
-        VerificationKey((&reddsa::SigningKey::new(OsRng)).into())
-    }
-
     /// Randomizes this verification key with the given `randomizer`.
     ///
     /// Randomization is only supported for `SpendAuth` keys.
@@ -180,48 +170,4 @@ pub(crate) mod private {
     impl Sealed for SpendAuth {}
 
     impl Sealed for Binding {}
-}
-
-/// Generators for property testing.
-#[cfg(test)]
-pub mod testing {
-    use proptest::prelude::*;
-
-    use super::{Binding, SigningKey, SpendAuth, VerificationKey};
-
-    prop_compose! {
-        /// Generate a uniformly distributed RedDSA spend authorization signing key.
-        pub fn arb_spendauth_signing_key()(
-            sk in prop::array::uniform32(prop::num::u8::ANY)
-                .prop_map(reddsa::SigningKey::try_from)
-                .prop_filter("Values must be parseable as valid signing keys", |r| r.is_ok())
-        ) -> SigningKey<SpendAuth> {
-            SigningKey(sk.unwrap())
-        }
-    }
-
-    prop_compose! {
-        /// Generate a uniformly distributed RedDSA binding signing key.
-        pub fn arb_binding_signing_key()(
-            sk in prop::array::uniform32(prop::num::u8::ANY)
-                .prop_map(reddsa::SigningKey::try_from)
-                .prop_filter("Values must be parseable as valid signing keys", |r| r.is_ok())
-        ) -> SigningKey<Binding> {
-            SigningKey(sk.unwrap())
-        }
-    }
-
-    prop_compose! {
-        /// Generate a uniformly distributed RedDSA spend authorization verification key.
-        pub fn arb_spendauth_verification_key()(sk in arb_spendauth_signing_key()) -> VerificationKey<SpendAuth> {
-            VerificationKey::from(&sk)
-        }
-    }
-
-    prop_compose! {
-        /// Generate a uniformly distributed RedDSA binding verification key.
-        pub fn arb_binding_verification_key()(sk in arb_binding_signing_key()) -> VerificationKey<Binding> {
-            VerificationKey::from(&sk)
-        }
-    }
 }

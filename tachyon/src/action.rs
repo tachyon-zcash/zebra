@@ -1,15 +1,15 @@
-//! Tachyon Action descriptions and authorization traits.
+//! Tachyon Action descriptions.
 
-use std::fmt;
-
-use crate::primitives::redpallas;
+use crate::primitives::{
+    Fp, NoteValue, PallasPoint, Signature, SpendAuth, Tachygram, VerificationKey,
+};
 use crate::value::ValueCommitment;
 
 /// A rerandomized spend authorization verification key (RedPallas).
-pub type RandomizedVerificationKey = redpallas::VerificationKey<redpallas::SpendAuth>;
+pub type RandomizedVerificationKey = VerificationKey<SpendAuth>;
 
 /// A spend authorization signature (RedPallas).
-pub type SpendAuthSignature = redpallas::Signature<redpallas::SpendAuth>;
+pub type SpendAuthSignature = Signature<SpendAuth>;
 
 /// A Tachyon Action description.
 ///
@@ -17,17 +17,11 @@ pub type SpendAuthSignature = redpallas::Signature<redpallas::SpendAuth>;
 /// Unlike Orchard actions which each have their own proof, Tachyon actions
 /// are aggregated into a single Ragu proof per block.
 ///
-/// ## Type Parameter
-///
-/// The type parameter `A` represents the authorization state of this action:
-/// - `()` - Unsigned action (no signature yet)
-/// - [`SpendAuthSignature`] - Fully authorized action
-///
 /// ## Fields
 ///
 /// - `cv`: Value commitment to net value (input - output)
 /// - `rk`: Randomized spend authorization key
-/// - `authorization`: Authorization data (signature or placeholder)
+/// - `authorization`: Spend authorization signature
 ///
 /// ## Note
 ///
@@ -40,50 +34,54 @@ pub type SpendAuthSignature = redpallas::Signature<redpallas::SpendAuth>;
 ///
 /// This separation allows the tachystamp to be stripped during aggregation
 /// while the action (with its signature) remains in the transaction.
-#[derive(Clone, Debug)]
-pub struct Action<A> {
+#[derive(Clone)]
+pub struct Action {
     /// Value commitment to net value (input - output).
     pub(crate) cv: ValueCommitment,
 
     /// Randomized spend authorization key.
     pub(crate) rk: RandomizedVerificationKey,
 
-    /// Authorization data for this action.
+    /// Spend authorization signature.
+    pub(crate) sig: SpendAuthSignature,
+}
+
+impl Action {
+    /// Creates a new spend action.
     ///
-    /// This is the spend authorization signature once the action is signed,
-    /// or a placeholder type during construction.
-    pub(crate) authorization: A,
-}
-
-impl<A> Action<A> {
-    /// Maps the authorization data using the provided function.
-    pub fn map<B>(self, f: impl FnOnce(A) -> B) -> Action<B> {
-        Action {
-            cv: self.cv,
-            rk: self.rk,
-            authorization: f(self.authorization),
-        }
+    /// # Arguments
+    ///
+    /// * `pk`: The public key of the spend authorization key.
+    /// * `v`: The value of the note.
+    /// * `psi`: The nullifier trapdoor.
+    /// * `rcm`: The note commitment.
+    pub fn spend(pk: [u8; 32], _v: NoteValue, _psi: Fp, _rcm: PallasPoint) -> (Self, Tachygram) {
+        (
+            Self {
+                cv: ValueCommitment(PallasPoint::default()),
+                rk: RandomizedVerificationKey::try_from(pk).unwrap(),
+                sig: SpendAuthSignature::from([0; 64]),
+            },
+            Tachygram(Fp::default()),
+        )
     }
 
-    /// Tries to map the authorization data, returning an error if the function fails.
-    pub fn try_map<B, E>(self, f: impl FnOnce(A) -> Result<B, E>) -> Result<Action<B>, E> {
-        Ok(Action {
-            cv: self.cv,
-            rk: self.rk,
-            authorization: f(self.authorization)?,
-        })
-    }
-}
-
-/// Marker type for unsigned actions.
-///
-/// Used as the authorization type parameter when actions are being constructed
-/// but not yet signed.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Unsigned;
-
-impl fmt::Display for Unsigned {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Unsigned")
+    /// Creates a new output action.
+    ///
+    /// # Arguments
+    ///
+    /// * `pk`: The public key of the spend authorization key.
+    /// * `v`: The value of the note.
+    /// * `psi`: The nullifier trapdoor.
+    /// * `rcm`: The note commitment.
+    pub fn output(pk: [u8; 32], _v: NoteValue, _psi: Fp, _rcm: PallasPoint) -> (Self, Tachygram) {
+        (
+            Self {
+                cv: ValueCommitment(PallasPoint::default()),
+                rk: RandomizedVerificationKey::try_from(pk).unwrap(),
+                sig: SpendAuthSignature::from([0; 64]),
+            },
+            Tachygram(Fp::default()),
+        )
     }
 }

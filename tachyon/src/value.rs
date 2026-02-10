@@ -11,5 +11,5 @@ use crate::primitives::PallasPoint;
 /// - `v` is the value
 /// - `rcv` is the randomness
 /// - `V` and `R` are generator points
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ValueCommitment(pub PallasPoint);
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ValueCommitment(pub(crate) PallasPoint);

@@ -13,11 +13,9 @@ use std::{
 };
 
 use group::ff::PrimeField;
-use halo2::pasta::pallas;
+use halo2::pasta::{pallas, Fp};
 
 use crate::serialization::serde_helpers;
-
-use super::commitment::NoteCommitment;
 
 /// A 32-byte blob representing either a nullifier or note commitment.
 ///
@@ -43,18 +41,6 @@ impl Tachygram {
     pub const SIZE: usize = 32;
 }
 
-impl From<&tachyon::Nullifier> for Tachygram {
-    fn from(nf: &tachyon::Nullifier) -> Self {
-        Self(nf.0)
-    }
-}
-
-impl From<&NoteCommitment> for Tachygram {
-    fn from(cm: &NoteCommitment) -> Self {
-        Self(cm.extract_x())
-    }
-}
-
 impl fmt::Debug for Tachygram {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Tachygram")
@@ -65,6 +51,6 @@ impl fmt::Debug for Tachygram {
 
 impl From<tachyon::Tachygram> for Tachygram {
     fn from(tg: tachyon::Tachygram) -> Self {
-        Self(tg.0)
+        Self(Fp::from(tg))
     }
 }

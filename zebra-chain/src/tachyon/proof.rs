@@ -18,7 +18,7 @@
 /// The proof certifies that all tachyactions in a transaction follow
 /// the correct rules for spend and output operations, preserving
 /// value balance integrity without revealing amounts.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Proof(());
 
 impl Proof {
