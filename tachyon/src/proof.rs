@@ -12,7 +12,7 @@
 /// The proof certifies that all tachyactions in a transaction follow
 /// the correct rules for spend and output operations, preserving
 /// value balance integrity without revealing amounts.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Proof(pub(crate) ());
 
 impl Proof {

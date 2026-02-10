@@ -17,7 +17,7 @@
 //! - Note commitments
 //! - Accumulator updates
 
-mod redpallas;
+pub mod redpallas;
 
 use pasta_curves::pallas;
 

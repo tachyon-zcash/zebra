@@ -29,7 +29,7 @@ use super::commitment::NoteCommitment;
 /// Each tachyaction produces exactly one tachygram, and it is intentionally
 /// indistinguishable whether that tachygram represents a nullifier or
 /// commitment—this provides additional privacy.
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct Tachygram(#[serde(with = "serde_helpers::Base")] pub pallas::Base);
 
 impl Hash for Tachygram {

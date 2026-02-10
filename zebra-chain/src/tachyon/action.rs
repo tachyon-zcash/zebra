@@ -24,7 +24,7 @@ use super::commitment::ValueCommitment;
 /// Tachyon follows the Sapling pattern where the signature is included
 /// directly in the action. This is because tachyaction signatures are
 /// always required (never stripped during aggregation).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Tachyaction {
     /// Value commitment to net value (input - output).
     pub cv: ValueCommitment,

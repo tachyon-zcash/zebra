@@ -2,22 +2,14 @@
 
 use std::fmt;
 
-use crate::primitives::PallasPoint;
+use crate::primitives::redpallas;
 use crate::value::ValueCommitment;
 
-/// A rerandomized spend authorization key.
-///
-/// This is the public key used to verify the spend authorization signature.
-/// It is derived from the spending key with a rerandomization factor.
-/// As a public key, this is a point on the Pallas curve.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct RandomizedVerificationKey(pub PallasPoint);
+/// A rerandomized spend authorization verification key (RedPallas).
+pub type RandomizedVerificationKey = redpallas::VerificationKey<redpallas::SpendAuth>;
 
-/// A spend authorization signature.
-///
-/// This is a RedPallas signature authorizing a spend operation.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SpendAuthSignature(pub [u8; 64]);
+/// A spend authorization signature (RedPallas).
+pub type SpendAuthSignature = redpallas::Signature<redpallas::SpendAuth>;
 
 /// A Tachyon Action description.
 ///
@@ -48,7 +40,7 @@ pub struct SpendAuthSignature(pub [u8; 64]);
 ///
 /// This separation allows the tachystamp to be stripped during aggregation
 /// while the action (with its signature) remains in the transaction.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Action<A> {
     /// Value commitment to net value (input - output).
     pub(crate) cv: ValueCommitment,
@@ -87,7 +79,7 @@ impl<A> Action<A> {
 ///
 /// Used as the authorization type parameter when actions are being constructed
 /// but not yet signed.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Unsigned;
 
 impl fmt::Display for Unsigned {

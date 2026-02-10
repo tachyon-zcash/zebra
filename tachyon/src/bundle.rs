@@ -28,26 +28,11 @@ use std::fmt;
 use std::vec::Vec;
 
 use crate::action::{Action, SpendAuthSignature, Unsigned};
+use crate::primitives::redpallas;
 use crate::tachystamp::Tachystamp;
 
-/// A binding signature for value balance verification.
-///
-/// This signature proves that the value commitments in actions sum to the
-/// declared value balance without revealing actual amounts.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct BindingSignature(pub [u8; 64]);
-
-impl From<[u8; 64]> for BindingSignature {
-    fn from(bytes: [u8; 64]) -> Self {
-        Self(bytes)
-    }
-}
-
-impl From<BindingSignature> for [u8; 64] {
-    fn from(sig: BindingSignature) -> Self {
-        sig.0
-    }
-}
+/// A binding signature for value balance verification (RedPallas).
+pub type BindingSignature = redpallas::Signature<redpallas::Binding>;
 
 // =============================================================================
 // Authorization trait and states
@@ -84,7 +69,7 @@ impl Authorization for Unsigned {
 /// - Tachystamp (tachygrams, proof, anchor)
 ///
 /// Autonome bundles can appear directly in blocks without an aggregate.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Autonome {
     /// Binding signature on transaction sighash.
     binding_sig: BindingSignature,
@@ -126,7 +111,7 @@ impl Authorization for Autonome {
 /// - NO tachystamp (covered by aggregate)
 ///
 /// Adjunct bundles require a corresponding aggregate in the same block.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Adjunct {
     /// Binding signature on transaction sighash.
     binding_sig: BindingSignature,
@@ -158,7 +143,7 @@ impl Authorization for Adjunct {
 ///
 /// Multiple aggregates can exist in a single block, each covering a
 /// different set of adjunct bundles.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Aggregate {
     /// Binding signature on transaction sighash.
     binding_sig: BindingSignature,
@@ -217,7 +202,7 @@ impl Authorization for Aggregate {
 ///
 /// Unlike Orchard, Tachyon does not have a `flags` field. Tachyon's unified
 /// action model makes the spend/output distinction unnecessary at the protocol level.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Bundle<A: Authorization, V> {
     /// Net value of Tachyon spends minus outputs.
     ///

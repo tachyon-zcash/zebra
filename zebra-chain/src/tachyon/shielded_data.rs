@@ -68,7 +68,7 @@ use super::{
 ///
 /// Note: Unlike Orchard, Tachyon does not have a `flags` field. Tachyon's unified
 /// action model makes the spend/output distinction unnecessary at the protocol level.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ShieldedData {
     /// The tachyactions (cv, rk, and spend authorization signature for each).
     ///
@@ -106,7 +106,7 @@ pub struct ShieldedData {
 ///
 /// During aggregation, tachystamps are merged into a single aggregate
 /// tachystamp that goes into the coinbase transaction.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Tachystamp {
     /// All tachygrams from this transaction.
     ///

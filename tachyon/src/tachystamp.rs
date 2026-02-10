@@ -24,7 +24,7 @@ use crate::proof::Proof;
 ///
 /// Epochs from multiple tachystamps can be accumulated into a single epoch
 /// during proof aggregation.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Tachystamp {
     /// All tachygrams from this transaction.
     ///
