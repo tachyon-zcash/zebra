@@ -4,19 +4,36 @@
 //! aggregation. This enables efficient recursive proof composition where
 //! multiple transaction proofs can be merged into a single proof.
 
+use crate::{BindingSignature, ValueCommitment, action::Tachyaction, primitives::Epoch};
+
 /// Ragu proof for Tachyon transactions.
-///
-/// The const parameter `N` is the number of tachygrams (proof inputs)
-/// this proof covers.
 ///
 /// This is a placeholder type. The actual proof structure will be
 /// defined when the Ragu PCD library is integrated.
 #[derive(Clone)]
-pub struct Proof<const N: usize>(pub(crate) ());
+pub struct Proof;
 
-impl<const N: usize> Proof<N> {
-    /// Creates a new placeholder proof.
-    pub fn placeholder() -> Self {
-        Self(())
+impl Default for Proof {
+    fn default() -> Self {
+        Self
+    }
+}
+
+/// An error returned when proof verification fails.
+pub enum ProofValidationError {
+    /// The proof did not verify.
+    Failure,
+}
+
+impl Proof {
+    /// Verifies this proof against the given public inputs.
+    pub fn verify(
+        &self,
+        _anchor: Epoch,
+        _value_balance: ValueCommitment,
+        _binding_sig: BindingSignature,
+        _tachyactions: Vec<Tachyaction>,
+    ) -> Result<(), ProofValidationError> {
+        Ok(())
     }
 }

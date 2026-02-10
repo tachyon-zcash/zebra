@@ -1,8 +1,9 @@
 //! Tachyon Action descriptions.
 
-use crate::primitives::{
-    Fp, NoteValue, PallasPoint, Signature, SpendAuth, Tachygram, VerificationKey,
-};
+use reddsa::Signature;
+
+use crate::keys::{SpendAuth, VerificationKey};
+use crate::primitives::{Fp, NoteValue, PallasPoint, Tachygram};
 use crate::value::ValueCommitment;
 
 /// A rerandomized spend authorization verification key (RedPallas).
@@ -10,6 +11,12 @@ pub type RandomizedVerificationKey = VerificationKey<SpendAuth>;
 
 /// A spend authorization signature (RedPallas).
 pub type SpendAuthSignature = Signature<SpendAuth>;
+
+/// An action paired with its tachygram.
+///
+/// Each action relates to exactly one tachygram. The pair is the input
+/// to proof verification.
+pub type Tachyaction = (Action, Tachygram);
 
 /// A Tachyon Action description.
 ///
@@ -55,7 +62,7 @@ impl Action {
     /// * `v`: The value of the note.
     /// * `psi`: The nullifier trapdoor.
     /// * `rcm`: The note commitment.
-    pub fn spend(pk: [u8; 32], _v: NoteValue, _psi: Fp, _rcm: PallasPoint) -> (Self, Tachygram) {
+    pub fn spend(pk: [u8; 32], _v: NoteValue, _psi: Fp, _rcm: PallasPoint) -> Tachyaction {
         (
             Self {
                 cv: ValueCommitment(PallasPoint::default()),
@@ -74,7 +81,7 @@ impl Action {
     /// * `v`: The value of the note.
     /// * `psi`: The nullifier trapdoor.
     /// * `rcm`: The note commitment.
-    pub fn output(pk: [u8; 32], _v: NoteValue, _psi: Fp, _rcm: PallasPoint) -> (Self, Tachygram) {
+    pub fn output(pk: [u8; 32], _v: NoteValue, _psi: Fp, _rcm: PallasPoint) -> Tachyaction {
         (
             Self {
                 cv: ValueCommitment(PallasPoint::default()),

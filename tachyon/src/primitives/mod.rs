@@ -29,29 +29,6 @@ pub type Fq = pallas::Scalar;
 /// A Pallas point.
 pub type PallasPoint = pallas::Affine;
 
-mod redpallas;
-
-pub use redpallas::{Binding, Signature, SigningKey, SpendAuth, VerificationKey};
-
-mod keys;
-
-pub use keys::{NullifierKey, PaymentKey, SpendingKey};
-
-/// Domain separator for Tachyon nullifier derivation.
-///
-/// Used in the GGM Tree PRF construction to domain-separate
-/// nullifier computations from other hash uses.
-pub const NULLIFIER_DOMAIN: &str = "Tachyon_Nullifier";
-
-/// Domain separator for Tachyon note commitments.
-pub const NOTE_COMMITMENT_DOMAIN: &str = "Tachyon_NoteCommit";
-
-/// Domain separator for Tachyon value commitments.
-pub const VALUE_COMMITMENT_DOMAIN: &str = "Tachyon_ValueCommit";
-
-/// Domain separator for the polynomial accumulator.
-pub const ACCUMULATOR_DOMAIN: &str = "Tachyon_Accumulator";
-
 /// The non-negative value of an individual Tachyon note.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub struct NoteValue(u64);
@@ -105,3 +82,13 @@ impl From<Tachygram> for Fp {
         tg.0
     }
 }
+
+/// The epoch range anchoring a stamp.
+///
+/// The anchor identifies a state range for:
+/// - Nullifier flavor $\tau$
+/// - Proof aggregation by intersection with other anchors
+/// - Membership proofs for note commitments (inclusion)
+/// - Non-membership proofs for nullifiers (non-inclusion)
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Epoch(pub Fp);
