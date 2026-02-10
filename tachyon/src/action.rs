@@ -40,7 +40,12 @@ pub struct SpendAuthSignature(pub [u8; 64]);
 /// ## Note
 ///
 /// The tachygram (nullifier or note commitment) is NOT part of the action.
-/// Tachygrams are collected separately in the [`Tachystamp`](crate::bundle::Tachystamp).
+/// Tachygrams are collected separately in the
+/// [`Tachystamp`](crate::tachystamp::Tachystamp).  However, `rk` is not a
+/// direct input to the Ragu proof -- each `rk` is cryptographically bound to
+/// its corresponding tachygram, which *is* a proof input, so the proof
+/// validates `rk` transitively.
+///
 /// This separation allows the tachystamp to be stripped during aggregation
 /// while the action (with its signature) remains in the transaction.
 #[derive(Clone, Debug, PartialEq, Eq)]

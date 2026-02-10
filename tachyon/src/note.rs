@@ -32,15 +32,13 @@ pub struct Note {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NullifierTrapdoor(pub Fp);
 
-/// The epoch (accumulator anchor) for Tachyon transactions.
+/// The epoch range anchoring a tachyaction.
 ///
-/// The epoch is the polynomial commitment representing the accumulator state:
-/// - Identifies the state of the polynomial accumulator at a point in time
-/// - Enables membership proofs for tachygrams
-/// - Used as the "flavor" in nullifier derivation
-///
-/// Epochs are valid within a range and can be accumulated to a single epoch
-/// during proof aggregation.
+/// The anchor identifies a state range for:
+/// - Nullifier flavor $\tau$
+/// - Proof aggregation by intersection with other anchors
+/// - Membership proofs for note commitments (inclusion)
+/// - Non-membership proofs for nullifiers (non-inclusion)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Epoch(pub Fp);
 
@@ -69,11 +67,9 @@ impl std::fmt::Display for Epoch {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Nullifier(pub Fp);
 
-
 /// A note commitment.
 ///
 /// This is a hiding commitment to a note, stored in the polynomial accumulator
 /// as a tachygram.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NoteCommitment(pub Fp);
-

@@ -27,8 +27,7 @@
 use std::fmt;
 use std::vec::Vec;
 
-use crate::Action;
-use crate::action::{SpendAuthSignature, Unsigned};
+use crate::action::{Action, SpendAuthSignature, Unsigned};
 use crate::tachystamp::Tachystamp;
 
 /// A binding signature for value balance verification.

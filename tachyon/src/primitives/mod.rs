@@ -17,6 +17,8 @@
 //! - Note commitments
 //! - Accumulator updates
 
+mod redpallas;
+
 use pasta_curves::pallas;
 
 /// Re-export of the Pallas base field element type $\mathbb{F}_p$.

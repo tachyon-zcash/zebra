@@ -3,16 +3,6 @@
 //! Tachyon uses **Ragu PCD** (Proof-Carrying Data) for proof generation and
 //! aggregation. This enables efficient recursive proof composition where
 //! multiple transaction proofs can be merged into a single proof.
-//!
-//! ## Proof Demonstrates
-//!
-//! | Component | What the proof establishes |
-//! |-----------|---------------------------|
-//! | Nullifier Derivation | $\mathsf{nf} = \mathsf{PRF_{nf}}(\mathsf{nk}', \rho, \mathsf{flavor})$ is correctly computed |
-//! | Accumulator Membership | Note commitment exists in the polynomial accumulator |
-//! | Value Conservation | Input and output values balance correctly |
-//! | Key Re-randomization | Signing keys are properly derived |
-//! | Tachygram Validity | 32-byte unified identifiers are correctly formed |
 
 /// Ragu proof for Tachyon transactions.
 ///

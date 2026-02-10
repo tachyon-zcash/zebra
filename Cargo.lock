@@ -5024,6 +5024,8 @@ dependencies = [
  "group",
  "pasta_curves",
  "proptest",
+ "rand 0.8.5",
+ "reddsa",
  "serde",
 ]
 
