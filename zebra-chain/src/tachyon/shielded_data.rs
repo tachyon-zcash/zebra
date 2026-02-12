@@ -1,177 +1,69 @@
 //! Tachyon shielded data for transactions.
 //!
-//! This module defines types for Tachyon transactions:
+//! [`ShieldedData`] is the zebra-chain representation of a Tachyon bundle,
+//! using tachyon crate types directly for its fields. Serde is implemented
+//! at the bundle level via a proxy struct pattern.
 //!
-//! - [`ShieldedData`] - Tachyon bundle containing actions, value balance, and optional tachystamp
-//! - [`Tachystamp`] - Contains tachygrams, proof, and anchor (stripped during aggregation)
+//! ## Stamp optionality
 //!
-//! ## Bundle Categories
-//!
-//! A Tachyon bundle falls into one of five categories based on its field values:
-//!
-//! | Category | actions | tachystamp | Description |
-//! | -------- | ------- | ---------- | ----------- |
-//! | **Adjunct** | non-empty | None | Stripped; tachystamp moved to aggregate |
-//! | **Autonome** | non-empty | Some (len = actions) | Self-contained with own tachystamp |
-//! | **Aggregate** | any | Some (len > actions) | Carries merged tachystamp for adjuncts |
-//!
-//! Aggregates have two flavors:
-//! - **Based** (`!actions.is_empty()`): has own actions; "based" = coin*base*
-//! - **Innocent** (`actions.is_empty()`): only carries others' tachystamps
-//!
-//! Note: When both `actions` is empty AND `tachystamp` is None, the bundle serializes
-//! as `Option<ShieldedData>::None` (no Tachyon activity).
-//!
-//! ## Aggregate Transaction Model
-//!
-//! Tachyon uses an aggregate proof model:
-//!
-//! 1. Users broadcast **autonome** transactions with complete tachystamp
-//! 2. Aggregators collect transactions and merge tachystamps
-//! 3. In blocks, individual transactions become **adjuncts** (tachystamp set to None)
-//! 4. The **based aggregate** (typically coinbase) contains merged tachystamp + own actions
-//! 5. An **innocent aggregate** carries only merged tachystamps with no own actions
+//! A bundle's stamp is `Option<Stamp>`:
+//! - `Some`: bundle carries its own proof and tachygrams
+//! - `None`: stamp was stripped and merged into another bundle in the same block
 
 use std::fmt;
 
+use group::ff::PrimeField;
 use halo2::pasta::pallas;
-use reddsa::{orchard::Binding, Signature};
 
 use crate::amount::{Amount, NegativeAllowed};
 
-use super::{
-    accumulator, action::Tachyaction, commitment::ValueCommitment, proof::Proof,
-    tachygram::Tachygram,
-};
-
 /// Tachyon shielded data bundle for a transaction.
 ///
-/// This is the main Tachyon bundle type, analogous to `sapling::ShieldedData`
-/// and `orchard::ShieldedData`.
-///
-/// ## Bundle Categories
-///
-/// The combination of `actions` and `tachystamp` determines the bundle category:
-///
-/// - **Adjunct**: `tachystamp.is_none() && !actions.is_empty()`
-///   - Stripped transaction; tachystamp moved to an aggregate
-///   - Depends on a preceding aggregate in the block for proof verification
-///
-/// - **Autonome**: `tachystamp.is_some() && tachygrams.len() == actions.len()`
-///   - Self-contained transaction with its own complete tachystamp
-///   - Can appear anywhere in a block without disrupting aggregate-adjunct sequences
-///
-/// - **Aggregate**: `tachystamp.is_some() && tachygrams.len() > actions.len()`
-///   - Carries merged tachystamp covering following adjuncts
-///   - **Based aggregate**: has own actions; "based" = coin*base* (miner shielding rewards)
-///   - **Innocent aggregate**: no own actions, only carries others' tachystamps
-///
-/// Note: Unlike Orchard, Tachyon does not have a `flags` field. Tachyon's unified
-/// action model makes the spend/output distinction unnecessary at the protocol level.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Uses tachyon crate types directly. Serde is implemented at the bundle
+/// level — individual tachyon types do not carry serde derives.
+#[derive(Clone)]
 pub struct ShieldedData {
-    /// The tachyactions (cv, rk, and spend authorization signature for each).
-    ///
-    /// Each action represents a spend and/or output operation.
-    /// Empty for pure aggregates that only carry others' tachystamps.
-    pub actions: Vec<Tachyaction>,
+    /// The actions (cv, rk, sig for each).
+    pub actions: Vec<tachyon::Action>,
 
     /// Net value of Tachyon spends minus outputs.
-    ///
-    /// Positive means value flows out of Tachyon pool (deshielding).
-    /// Negative means value flows into Tachyon pool (shielding).
-    /// Zero when actions is empty.
     pub value_balance: Amount<NegativeAllowed>,
 
     /// Binding signature on transaction sighash.
-    ///
-    /// This proves that the value commitments in actions sum to the
-    /// declared value_balance without revealing actual amounts.
     /// None when actions is empty (nothing to sign over).
-    pub binding_sig: Option<Signature<Binding>>,
+    pub binding_sig: Option<tachyon::BindingSignature>,
 
-    /// The tachystamp containing proof, tachygrams, and epoch.
-    ///
-    /// Present when the transaction is broadcast, None after stripping
-    /// during aggregation.
-    pub tachystamp: Option<Tachystamp>,
+    /// The stamp containing proof, tachygrams, and epoch.
+    /// None after stripping during aggregation.
+    pub stamp: Option<tachyon::Stamp>,
 }
 
-/// Tachystamp containing the proof, tachygrams, and epoch.
-///
-/// This type bundles:
-/// - All tachygrams (nullifiers and note commitments) for the transaction
-/// - The Ragu proof proving validity of all operations
-/// - The epoch (accumulator state)
-///
-/// During aggregation, tachystamps are merged into a single aggregate
-/// tachystamp that goes into the coinbase transaction.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Tachystamp {
-    /// All tachygrams from this transaction.
-    ///
-    /// These are the nullifiers and note commitments that get recorded
-    /// in the polynomial accumulator.
-    pub tachygrams: Vec<Tachygram>,
-
-    /// The Ragu proof covering all operations.
-    pub proof: Proof,
-
-    /// The epoch (accumulator state).
-    ///
-    /// All spends in this transaction reference notes committed at or
-    /// before this accumulator state.
-    pub anchor: accumulator::Epoch,
-}
-
-impl Tachystamp {
-    /// Create a new tachystamp.
-    pub fn new(tachygrams: Vec<Tachygram>, proof: Proof, anchor: accumulator::Epoch) -> Self {
-        Self {
-            tachygrams,
-            proof,
-            anchor,
-        }
-    }
-
-    /// Get the number of tachygrams in this tachystamp.
-    pub fn tachygram_count(&self) -> usize {
-        self.tachygrams.len()
-    }
-}
-
-impl fmt::Display for ShieldedData {
+impl fmt::Debug for ShieldedData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut debug = f.debug_struct("tachyon::ShieldedData");
         debug
             .field("actions", &self.actions.len())
             .field("value_balance", &self.value_balance);
 
-        if let Some(ref tachystamp) = self.tachystamp {
-            debug.field(
-                "tachystamp",
-                &format!("{} tachygrams", tachystamp.tachygram_count()),
-            );
+        if let Some(ref stamp) = self.stamp {
+            debug.field("stamp", &format!("{} tachygrams", stamp.tachygrams.len()));
         } else {
-            debug.field("tachystamp", &"None (stripped)");
+            debug.field("stamp", &"None (stripped)");
         }
 
         debug.finish()
     }
 }
 
-impl fmt::Display for Tachystamp {
+impl fmt::Display for ShieldedData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("tachyon::Tachystamp")
-            .field("tachygrams", &self.tachygrams.len())
-            .field("proof_size", &self.proof.as_bytes().len())
-            .finish()
+        fmt::Debug::fmt(self, f)
     }
 }
 
 impl ShieldedData {
     /// Iterate over the actions in this bundle.
-    pub fn actions(&self) -> impl Iterator<Item = &Tachyaction> {
+    pub fn actions(&self) -> impl Iterator<Item = &tachyon::Action> {
         self.actions.iter()
     }
 
@@ -180,79 +72,148 @@ impl ShieldedData {
         self.value_balance
     }
 
-    /// Calculate the binding verification key.
-    ///
-    /// This is used to verify the binding signature. The key is derived from
-    /// the value commitments in actions and the balancing value.
-    ///
-    /// Returns None if there are no actions (nothing to verify).
-    pub fn binding_verification_key(&self) -> Option<reddsa::VerificationKeyBytes<Binding>> {
-        if self.actions.is_empty() {
-            return None;
-        }
-
-        let cv: ValueCommitment = self.actions().map(|action| action.cv).sum();
-        let cv_balance = ValueCommitment::new(pallas::Scalar::zero(), self.value_balance);
-
-        let key_bytes: [u8; 32] = (cv - cv_balance).into();
-        Some(key_bytes.into())
-    }
-
     /// Count the number of actions in this bundle.
     pub fn actions_count(&self) -> usize {
         self.actions.len()
     }
 
-    /// Check if this is an adjunct bundle (stripped, tachystamp moved to aggregate).
+    /// Calculate the binding verification key.
     ///
-    /// An adjunct has actions but no tachystamp. It depends on a preceding
-    /// aggregate transaction in the block for proof verification.
-    pub fn is_adjunct(&self) -> bool {
-        !self.actions.is_empty() && self.tachystamp.is_none()
-    }
-
-    /// Check if this is an autonome bundle (self-contained with own tachystamp).
+    /// `bvk = sum(cv_i) - [value_balance] V`
     ///
-    /// An autonome has actions and a tachystamp where the tachygram count
-    /// equals the action count (one tachygram per action).
-    pub fn is_autonome(&self) -> bool {
-        if let Some(ref stamp) = self.tachystamp {
-            !self.actions.is_empty() && stamp.tachygrams.len() == self.actions.len()
-        } else {
-            false
+    /// Follows Orchard's `binding_validating_key()` pattern. The binding
+    /// signature proves that the signer knew all value commitment trapdoors,
+    /// which transitively proves value balance integrity.
+    /// Returns None if there are no actions.
+    pub fn binding_verification_key(&self) -> Option<tachyon::VerificationKey<tachyon::Binding>> {
+        if self.actions.is_empty() {
+            return None;
         }
-    }
 
-    /// Check if this is an aggregate bundle (carries merged tachystamp for adjuncts).
-    ///
-    /// An aggregate has a tachystamp where the tachygram count exceeds the
-    /// action count, meaning it carries tachygrams from following adjuncts.
-    ///
-    /// Aggregates come in two flavors:
-    /// - **Based**: has own actions ("based" = coin*base*, miner shielding rewards)
-    /// - **Innocent**: no own actions, only carries others' tachystamps
-    pub fn is_aggregate(&self) -> bool {
-        if let Some(ref stamp) = self.tachystamp {
-            stamp.tachygrams.len() > self.actions.len()
-        } else {
-            false
-        }
-    }
+        let cv: tachyon::ValueCommitment = self.actions().map(|action| action.cv).sum();
+        let cv_balance = tachyon::ValueCommitment::balance(self.value_balance.into());
 
-    /// Check if this is an innocent aggregate (no own actions).
-    ///
-    /// An innocent aggregate has no actions but has a tachystamp containing
-    /// merged tachygrams from other transactions. Contrast with a "based"
-    /// aggregate which has its own actions (typically coinbase shielding rewards).
-    pub fn is_innocent_aggregate(&self) -> bool {
-        self.actions.is_empty() && self.tachystamp.is_some()
+        Some((cv - cv_balance).into_bvk())
     }
+}
 
-    /// Check if this transaction has been stripped (tachystamp removed).
-    ///
-    /// Alias for [`is_adjunct`](Self::is_adjunct) - a stripped transaction
-    /// is one whose tachystamp has been moved to an aggregate.
-    pub fn is_stripped(&self) -> bool {
-        self.is_adjunct()
+// =============================================================================
+// Serde — implemented at the bundle level via proxy structs
+// =============================================================================
+
+use serde_big_array::BigArray;
+
+/// Serde proxy for a single Action.
+#[derive(Serialize, Deserialize)]
+struct ActionProxy {
+    cv: [u8; 32],
+    rk: [u8; 32],
+    #[serde(with = "BigArray")]
+    sig: [u8; 64],
+}
+
+/// Serde proxy for a Stamp.
+#[derive(Serialize, Deserialize)]
+struct StampProxy {
+    tachygrams: Vec<[u8; 32]>,
+    anchor: [u8; 32],
+    // Proof is a placeholder — serialize as empty for now
+}
+
+/// Serde proxy for ShieldedData.
+#[derive(Serialize, Deserialize)]
+struct ShieldedDataProxy {
+    actions: Vec<ActionProxy>,
+    value_balance: Amount<NegativeAllowed>,
+    binding_sig: Option<BindingSigBytes>,
+    stamp: Option<StampProxy>,
+}
+
+/// Wrapper for binding signature bytes with serde support.
+#[derive(Serialize, Deserialize)]
+struct BindingSigBytes(#[serde(with = "BigArray")] [u8; 64]);
+
+impl serde::Serialize for ShieldedData {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let proxy = ShieldedDataProxy {
+            actions: self
+                .actions
+                .iter()
+                .map(|a| ActionProxy {
+                    cv: <[u8; 32]>::from(a.cv),
+                    rk: <[u8; 32]>::from(&a.rk),
+                    sig: <[u8; 64]>::from(&a.sig),
+                })
+                .collect(),
+            value_balance: self.value_balance,
+            binding_sig: self
+                .binding_sig
+                .as_ref()
+                .map(|s| BindingSigBytes(<[u8; 64]>::from(s))),
+            stamp: self.stamp.as_ref().map(|s| StampProxy {
+                tachygrams: s
+                    .tachygrams
+                    .iter()
+                    .map(|tg| <[u8; 32]>::from(*tg))
+                    .collect(),
+                anchor: s.anchor.0.to_repr(),
+            }),
+        };
+        proxy.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ShieldedData {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let proxy = ShieldedDataProxy::deserialize(deserializer)?;
+
+        let actions = proxy
+            .actions
+            .into_iter()
+            .map(|a| {
+                let cv =
+                    tachyon::ValueCommitment::try_from(a.cv).map_err(serde::de::Error::custom)?;
+                let rk = tachyon::RandomizedVerificationKey::try_from(a.rk)
+                    .map_err(serde::de::Error::custom)?;
+                let sig = tachyon::SpendAuthSignature::from(a.sig);
+                Ok(tachyon::Action { cv, rk, sig })
+            })
+            .collect::<Result<Vec<_>, D::Error>>()?;
+
+        let binding_sig = proxy
+            .binding_sig
+            .map(|b| tachyon::BindingSignature::from(b.0));
+
+        let stamp = proxy
+            .stamp
+            .map(|s| {
+                let tachygrams = s
+                    .tachygrams
+                    .into_iter()
+                    .map(|bytes| {
+                        tachyon::Tachygram::try_from(bytes).map_err(serde::de::Error::custom)
+                    })
+                    .collect::<Result<Vec<_>, D::Error>>()?;
+
+                let anchor_elem = pallas::Base::from_repr(s.anchor);
+                if bool::from(anchor_elem.is_none()) {
+                    return Err(serde::de::Error::custom("Invalid pallas::Base for anchor"));
+                }
+                let anchor = tachyon::Epoch(anchor_elem.unwrap().into());
+
+                Ok(tachyon::Stamp {
+                    tachygrams,
+                    proof: tachyon::Proof::default(),
+                    anchor,
+                })
+            })
+            .transpose()?;
+
+        Ok(ShieldedData {
+            actions,
+            value_balance: proxy.value_balance,
+            binding_sig,
+            stamp,
+        })
     }
 }

@@ -17,7 +17,6 @@
 //! - Note commitments
 //! - Accumulator updates
 
-use bitvec::{array::BitArray, order::Lsb0};
 use pasta_curves::pallas;
 
 /// The base field of the Pallas curve.
@@ -29,42 +28,6 @@ pub type Fq = pallas::Scalar;
 /// A Pallas point.
 pub type PallasPoint = pallas::Affine;
 
-/// The non-negative value of an individual Tachyon note.
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
-pub struct NoteValue(u64);
-
-impl NoteValue {
-    pub(crate) fn zero() -> Self {
-        // Default for u64 is zero.
-        Default::default()
-    }
-
-    /// Returns the raw underlying value.
-    pub fn inner(&self) -> u64 {
-        self.0
-    }
-
-    /// Creates a note value from its raw numeric value.
-    ///
-    /// This only enforces that the value is an unsigned 64-bit integer. Callers should
-    /// enforce any additional constraints on the value's valid range themselves.
-    pub fn from_raw(value: u64) -> Self {
-        NoteValue(value)
-    }
-
-    pub(crate) fn from_bytes(bytes: [u8; 8]) -> Self {
-        NoteValue(u64::from_le_bytes(bytes))
-    }
-
-    pub(crate) fn to_bytes(self) -> [u8; 8] {
-        self.0.to_le_bytes()
-    }
-
-    pub(crate) fn to_le_bits(self) -> BitArray<[u8; 8], Lsb0> {
-        BitArray::<_, Lsb0>::new(self.0.to_le_bytes())
-    }
-}
-
 /// A tachygram is a 32-byte blob representing either a note commitment
 /// or a nullifier in the Tachyon polynomial accumulator.
 ///
@@ -74,12 +37,33 @@ impl NoteValue {
 ///
 /// Each tachyaction produces exactly one tachygram, regardless of whether
 /// it represents a spend (nullifier) or output (commitment) operation.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Tachygram(pub(crate) Fp);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Tachygram(pub Fp);
 
 impl From<Tachygram> for Fp {
     fn from(tg: Tachygram) -> Self {
         tg.0
+    }
+}
+
+impl From<Tachygram> for [u8; 32] {
+    fn from(tg: Tachygram) -> Self {
+        use group::ff::PrimeField;
+        tg.0.to_repr()
+    }
+}
+
+impl TryFrom<[u8; 32]> for Tachygram {
+    type Error = &'static str;
+
+    fn try_from(bytes: [u8; 32]) -> Result<Self, Self::Error> {
+        use group::ff::PrimeField;
+        let elem = Fp::from_repr(bytes);
+        if elem.is_some().into() {
+            Ok(Self(elem.unwrap()))
+        } else {
+            Err("Invalid pallas::Base for Tachygram")
+        }
     }
 }
 
@@ -90,5 +74,5 @@ impl From<Tachygram> for Fp {
 /// - Proof aggregation by intersection with other anchors
 /// - Membership proofs for note commitments (inclusion)
 /// - Non-membership proofs for nullifiers (non-inclusion)
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Epoch(pub Fp);

@@ -9,10 +9,11 @@
 //!
 //! ## Bundle States
 //!
-//! [`Bundle<S>`](Bundle) uses a type parameter to track stamp disposition:
+//! [`Bundle<S, V>`](Bundle) uses type parameters to track stamp disposition
+//! and value balance type:
 //!
-//! - [`StampedBundle`] (`Bundle<Stamp>`) — self-contained with stamp
-//! - [`StrippedBundle`] (`Bundle<Adjunct>`) — stamp stripped, depends on aggregate
+//! - [`StampedBundle<V>`] (`Bundle<Stamp, V>`) — self-contained with stamp
+//! - [`StrippedBundle<V>`] (`Bundle<Stripped, V>`) — stamp stripped, depends on aggregate
 //!
 //! ## Block Structure
 //!
@@ -37,14 +38,17 @@
 pub mod action;
 pub mod bundle;
 pub mod keys;
+pub mod note;
 pub mod primitives;
 pub mod proof;
 pub mod stamp;
-pub mod value;
 
-pub use action::{Action, RandomizedVerificationKey, SpendAuthSignature, Tachyaction};
-pub use bundle::{Adjunct, BindingSignature, Bundle, StampedBundle, StrippedBundle};
-pub use primitives::Tachygram;
-pub use proof::Proof;
+pub use action::{
+    Action, RandomizedVerificationKey, SpendAuthSignature, ValueCommitTrapdoor, ValueCommitment,
+};
+pub use bundle::{BindingSignature, Bundle, StampedBundle, StrippedBundle};
+pub use keys::{Binding, SigningKey, SpendAuth, VerificationKey};
+pub use note::{Note, NoteCommitment, Nullifier};
+pub use primitives::{Epoch, Tachygram};
+pub use proof::{ActionWitness, Proof};
 pub use stamp::Stamp;
-pub use value::ValueCommitment;
