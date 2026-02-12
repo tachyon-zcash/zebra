@@ -74,6 +74,7 @@ fn all_upgrades_and_wrong_commitments_with_fake_activation_heights() -> Result<(
             nu6: Some(40),
             nu6_1: Some(45),
             nu7: Some(50),
+            zfuture: Some(55),
         })
         .expect("failed to set activation heights")
         .extend_funding_streams()

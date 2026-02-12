@@ -3689,8 +3689,8 @@ async fn nu7_nsm_transactions() -> Result<()> {
         .with_checkpoints(false)
         .with_target_difficulty_limit(U256::from_big_endian(&[0x0f; 32]))
         .with_disable_pow(true)
-        .with_slow_start_interval(Height::MIN)
-        .with_lockbox_disbursements(vec![])
+        .with_slow_start_interval(Height::MIN)?
+        .with_lockbox_disbursements(vec![])?
         .with_activation_heights(ConfiguredActivationHeights {
             nu7: Some(1),
             ..Default::default()
