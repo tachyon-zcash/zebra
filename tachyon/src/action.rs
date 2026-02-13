@@ -42,7 +42,7 @@ pub type SpendAuthSignature = Signature<SpendAuth>;
 ///
 /// This separation allows the stamp to be stripped during aggregation
 /// while the action (with its authorization) remains in the transaction.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Action {
     /// Value commitment to net value (input - output).
     pub cv: ValueCommitment,

@@ -147,7 +147,7 @@ impl<T: SigType> VerificationKey<T> {
 }
 
 /// A RedPallas signature.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Signature<T: SigType>(reddsa::Signature<T>);
 
 impl<T: SigType> From<[u8; 64]> for Signature<T> {

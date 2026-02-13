@@ -52,6 +52,7 @@ use crate::{
     sapling,
     serialization::ZcashSerialize,
     sprout,
+    tachyon,
     transparent::{
         self, outputs_from_utxos,
         CoinbaseSpendRestriction::{self, *},
@@ -171,6 +172,28 @@ pub enum Transaction {
         sapling_shielded_data: Option<sapling::ShieldedData<sapling::SharedAnchor>>,
         /// The orchard data for this transaction, if any.
         orchard_shielded_data: Option<orchard::ShieldedData>,
+    },
+    V7 {        /// The Network Upgrade for this transaction.
+        ///
+        /// Derived from the ConsensusBranchId field.
+        network_upgrade: NetworkUpgrade,
+        /// The earliest time or block height that this transaction can be added to the
+        /// chain.
+        lock_time: LockTime,
+        /// The latest block height that this transaction can be added to the chain.
+        expiry_height: block::Height,
+        /// The burn amount for this transaction, if any.
+        zip233_amount: Amount<NonNegative>,
+        /// The transparent inputs to the transaction.
+        inputs: Vec<transparent::Input>,
+        /// The transparent outputs from the transaction.
+        outputs: Vec<transparent::Output>,
+        /// The sapling shielded data for this transaction, if any.
+        sapling_shielded_data: Option<sapling::ShieldedData<sapling::SharedAnchor>>,
+        /// The orchard data for this transaction, if any.
+        orchard_shielded_data: Option<orchard::ShieldedData>,
+        /// The tachyon data for this transaction, if any.
+        tachyon_shielded_data: Option<tachyon::ShieldedData>,
     },
 }
 

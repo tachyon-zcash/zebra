@@ -29,7 +29,7 @@ use crate::primitives::{Epoch, Fp, Fq, Tachygram};
 /// Opaque byte blob covering all actions in an aggregate. The internal
 /// structure will be defined by the Ragu PCD library; methods on this
 /// type are stubs marking the design boundary.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Proof(Vec<u8>);
 
 impl Proof {

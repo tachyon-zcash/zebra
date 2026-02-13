@@ -15,7 +15,7 @@ use crate::proof::{ActionWitness, Proof};
 ///
 /// Present in [`StampedBundle`](crate::StampedBundle) bundles.
 /// Stripped from adjuncts during aggregation.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Stamp {
     /// Tachygrams (nullifiers and note commitments) for the accumulator.
     pub tachygrams: Vec<Tachygram>,
