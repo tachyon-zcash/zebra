@@ -313,6 +313,7 @@ impl Transaction {
             Transaction::V5 { .. } => Some(AuthDigest::from(self)),
             #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
             Transaction::V6 { .. } => Some(AuthDigest::from(self)),
+            Transaction::V7 { .. } => Some(AuthDigest::from(self)),
         }
     }
 

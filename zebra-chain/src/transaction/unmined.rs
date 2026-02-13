@@ -144,6 +144,7 @@ impl From<&Transaction> for UnminedTxId {
             V5 { .. } => Witnessed(transaction.into()),
             #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
             V6 { .. } => Witnessed(transaction.into()),
+            V7 { .. } => Witnessed(transaction.into()),
         }
     }
 }

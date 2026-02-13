@@ -30,6 +30,7 @@ impl<'a> TxIdBuilder<'a> {
             Transaction::V5 { .. } => self.txid_v5(),
             #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
             Transaction::V6 { .. } => self.txid_v6(),
+            Transaction::V7 { .. } => self.txid_v7(),
         }
     }
 
@@ -54,6 +55,11 @@ impl<'a> TxIdBuilder<'a> {
     /// Passthrough to txid_v5 for V6 transactions.
     #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
     fn txid_v6(self) -> Option<Hash> {
+        self.txid_v5()
+    }
+
+    /// Passthrough to txid_v5 for V7 transactions.
+    fn txid_v7(self) -> Option<Hash> {
         self.txid_v5()
     }
 }
