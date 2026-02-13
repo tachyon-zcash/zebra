@@ -1049,6 +1049,17 @@ where
         Self::verify_v5_transaction(request, network, script_verifier, cached_ffi_transaction)
     }
 
+    /// Passthrough to verify_v5_transaction, but for V7 transactions.
+    //#[cfg(all(zcash_unstable = "zfuture", feature = "tx_v7"))]
+    fn verify_v7_transaction(
+        request: &Request,
+        network: &Network,
+        script_verifier: script::Verifier,
+        cached_ffi_transaction: Arc<CachedFfiTransaction>,
+    ) -> Result<AsyncChecks, TransactionError> {
+        Self::verify_v5_transaction(request, network, script_verifier, cached_ffi_transaction)
+    }
+
     /// Verifies if a transaction's transparent inputs are valid using the provided
     /// `script_verifier` and `cached_ffi_transaction`.
     ///
