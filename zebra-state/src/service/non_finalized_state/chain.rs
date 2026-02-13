@@ -1599,6 +1599,20 @@ impl Chain {
                     sapling_shielded_data,
                     orchard_shielded_data,
                 ),
+                V7 {
+                    inputs,
+                    outputs,
+                    sapling_shielded_data,
+                    orchard_shielded_data,
+                    ..
+                } => (
+                    inputs,
+                    outputs,
+                    &None,
+                    &None,
+                    sapling_shielded_data,
+                    orchard_shielded_data,
+                ),
 
                 V1 { .. } | V2 { .. } | V3 { .. } => unreachable!(
                     "older transaction versions only exist in finalized blocks, because of the mandatory canopy checkpoint",
@@ -1771,6 +1785,20 @@ impl UpdateWith<ContextuallyVerifiedBlock> for Chain {
                 ),
                 #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
                 V6 {
+                    inputs,
+                    outputs,
+                    sapling_shielded_data,
+                    orchard_shielded_data,
+                    ..
+                } => (
+                    inputs,
+                    outputs,
+                    &None,
+                    &None,
+                    sapling_shielded_data,
+                    orchard_shielded_data,
+                ),
+                V7 {
                     inputs,
                     outputs,
                     sapling_shielded_data,

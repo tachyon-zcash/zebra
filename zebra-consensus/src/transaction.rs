@@ -526,6 +526,14 @@ where
                     script_verifier,
                     cached_ffi_transaction.clone(),
                 )?,
+                Transaction::V7 {
+                    ..
+                } => Self::verify_v5_transaction(
+                    &req,
+                    &network,
+                    script_verifier,
+                    cached_ffi_transaction.clone(),
+                )?,
             };
 
             if let Some(unmined_tx) = req.mempool_transaction() {
