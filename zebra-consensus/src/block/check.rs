@@ -68,6 +68,64 @@ pub fn coinbase_is_first(block: &Block) -> Result<Arc<transaction::Transaction>,
     Ok(first.clone())
 }
 
+/// Checks tachyon aggregation rules for blocks with tachyon transactions.
+/// 
+/// Enforces that if the block contains any non-coinbase transactions with tachyon_shielded_data,
+/// then those transactions must have their tachyon_shielded_data.stamp == None (stripped).
+/// The coinbase transaction MUST have its tachyon_shielded_data.stamp = Some(...) (aggregated).
+///
+/// Returns `Ok(())` if the tachyon aggregation rules are satisfied.
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+pub fn coinbase_has_tachyon_aggregate(block: &Block) -> Result<(), BlockError> {
+    use zebra_chain::transaction::Transaction;
+    
+    // Get the coinbase transaction (first transaction)
+    let coinbase_tx = block
+        .transactions
+        .first()
+        .ok_or(BlockError::NoTransactions)?;
+
+    // Check all non-coinbase transactions
+    let non_coinbase_txs = block.transactions.iter().skip(1);
+    
+    // Collect all non-coinbase transactions that have tachyon_shielded_data
+    let mut has_tachyon_non_coinbase = false;
+    for tx in non_coinbase_txs {
+        // Check if this is a V6 transaction with tachyon data
+        if let Transaction::V6 { tachyon_shielded_data: Some(tachyon_data), .. } = tx.as_ref() {
+            has_tachyon_non_coinbase = true;
+            
+            // Non-coinbase transactions with tachyon data MUST have stamp == None
+            if tachyon_data.stamp.is_some() {
+                return Err(BlockError::Other(
+                    "Non-coinbase transaction with tachyon_shielded_data must have stamp == None".to_string()
+                ));
+            }
+        }
+    }
+    
+    // If there are non-coinbase transactions with tachyon data, 
+    // the coinbase MUST have tachyon data with a stamp
+    if has_tachyon_non_coinbase {
+        match coinbase_tx.as_ref() {
+            Transaction::V6 { tachyon_shielded_data: Some(coinbase_tachyon_data), .. } => {
+                if coinbase_tachyon_data.stamp.is_none() {
+                    return Err(BlockError::Other(
+                        "Coinbase transaction must have tachyon_shielded_data.stamp = Some(...) when block contains tachyon transactions".to_string()
+                    ));
+                }
+            }
+            Transaction::V6 { tachyon_shielded_data: None, .. } | _ => {
+                return Err(BlockError::Other(
+                    "Coinbase transaction must have tachyon_shielded_data when block contains tachyon transactions".to_string()
+                ));
+            }
+        }
+    }
+    
+    Ok(())
+}
+
 /// Returns `Ok(ExpandedDifficulty)` if the`difficulty_threshold` of `header` is at least as difficult as
 /// the target difficulty limit for `network` (PoWLimit)
 ///

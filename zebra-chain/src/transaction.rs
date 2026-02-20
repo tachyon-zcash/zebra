@@ -52,7 +52,6 @@ use crate::{
     sapling,
     serialization::ZcashSerialize,
     sprout,
-    tachyon,
     transparent::{
         self, outputs_from_utxos,
         CoinbaseSpendRestriction::{self, *},
@@ -60,6 +59,9 @@ use crate::{
     value_balance::{ValueBalance, ValueBalanceError},
     Error,
 };
+
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+use crate::tachyon;
 
 /// A Zcash transaction.
 ///
@@ -1822,6 +1824,7 @@ impl Transaction {
             } => None,
         }
     }
+
 
     /// Modify the transparent outputs of this transaction, regardless of version.
     pub fn outputs_mut(&mut self) -> &mut Vec<transparent::Output> {

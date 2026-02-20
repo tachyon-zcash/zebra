@@ -226,6 +226,10 @@ where
             check::time_is_valid_at(&block.header, now, &height, &hash)
                 .map_err(VerifyBlockError::Time)?;
             let coinbase_tx = check::coinbase_is_first(&block)?;
+            
+            // Check tachyon aggregation rules
+            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+            check::coinbase_has_tachyon_aggregate(&block)?;
 
             let expected_block_subsidy =
                 zebra_chain::parameters::subsidy::block_subsidy(height, &network)?;
