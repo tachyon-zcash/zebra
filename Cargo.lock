@@ -6723,7 +6723,6 @@ dependencies = [
 [[package]]
 name = "zcash_tachyon"
 version = "0.0.0"
-source = "git+http://github.com/tachyon-zcash/tachyon?rev=1ff9b78#1ff9b7823c2c996bec4bd47a12d9c3fce4a9ae57"
 dependencies = [
  "bitvec",
  "blake2b_simd",
