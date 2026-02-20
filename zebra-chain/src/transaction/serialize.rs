@@ -852,6 +852,7 @@ impl ZcashSerialize for Transaction {
                 outputs,
                 sapling_shielded_data,
                 orchard_shielded_data,
+                tachyon_shielded_data
             } => {
                 // Transaction V6 spec:
                 // https://zips.z.cash/zip-0230#specification
@@ -891,6 +892,8 @@ impl ZcashSerialize for Transaction {
                 // `flagsOrchard`,`valueBalanceOrchard`, `anchorOrchard`, `sizeProofsOrchard`,
                 // `proofsOrchard`, `vSpendAuthSigsOrchard`, and `bindingSigOrchard`.
                 orchard_shielded_data.zcash_serialize(&mut writer)?;
+
+                tachyon_shielded_data.zcash_serialize(&mut writer)?;
             }
         }
         Ok(())
@@ -1181,6 +1184,8 @@ impl ZcashDeserialize for Transaction {
                 // `proofsOrchard`, `vSpendAuthSigsOrchard`, and `bindingSigOrchard`.
                 let orchard_shielded_data = (&mut limited_reader).zcash_deserialize_into()?;
 
+                let tachyon_shielded_data = (&mut limited_reader).zcash_deserialize_into()?;
+
                 Ok(Transaction::V6 {
                     network_upgrade,
                     lock_time,
@@ -1190,6 +1195,7 @@ impl ZcashDeserialize for Transaction {
                     outputs,
                     sapling_shielded_data,
                     orchard_shielded_data,
+                    tachyon_shielded_data
                 })
             }
             (_, _) => Err(SerializationError::Parse("bad tx header")),

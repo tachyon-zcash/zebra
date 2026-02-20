@@ -20,7 +20,7 @@ use crate::amount::{Amount, NegativeAllowed};
 ///
 /// Uses tachyon crate types directly. Serde is implemented at the bundle
 /// level — individual tachyon types do not carry serde derives.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct ShieldedData {
     /// The actions (cv, rk, sig for each).
     pub actions: Vec<zcash_tachyon::Action>,

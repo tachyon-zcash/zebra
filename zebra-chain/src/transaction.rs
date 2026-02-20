@@ -52,6 +52,7 @@ use crate::{
     sapling,
     serialization::ZcashSerialize,
     sprout,
+    tachyon,
     transparent::{
         self, outputs_from_utxos,
         CoinbaseSpendRestriction::{self, *},
@@ -171,6 +172,8 @@ pub enum Transaction {
         sapling_shielded_data: Option<sapling::ShieldedData<sapling::SharedAnchor>>,
         /// The orchard data for this transaction, if any.
         orchard_shielded_data: Option<orchard::ShieldedData>,
+        /// The tachyon data for this transaction, if any.
+        tachyon_shielded_data: Option<tachyon::ShieldedData>,
     },
 }
 
