@@ -231,6 +231,10 @@ where
             #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
             check::coinbase_has_tachyon_aggregate(&block)?;
 
+            // Verify tachyon aggregate proof
+            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+            check::verify_tachyon_aggregate(&block)?;
+
             let expected_block_subsidy =
                 zebra_chain::parameters::subsidy::block_subsidy(height, &network)?;
 
