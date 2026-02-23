@@ -227,13 +227,9 @@ where
                 .map_err(VerifyBlockError::Time)?;
             let coinbase_tx = check::coinbase_is_first(&block)?;
             
-            // Check tachyon aggregation rules
+            // Validate and verify tachyon aggregate proofs
             #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-            check::coinbase_has_tachyon_aggregate(&block)?;
-
-            // Verify tachyon aggregate proof
-            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-            check::verify_tachyon_aggregate(&block)?;
+            check::verify_tachyon_aggregates(&block)?;
 
             let expected_block_subsidy =
                 zebra_chain::parameters::subsidy::block_subsidy(height, &network)?;

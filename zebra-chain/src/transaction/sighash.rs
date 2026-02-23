@@ -137,4 +137,10 @@ impl SigHasher {
     ) -> Option<sapling_crypto::Bundle<sapling_crypto::bundle::Authorized, ZatBalance>> {
         self.precomputed_tx_data.sapling_bundle()
     }
+
+    pub fn tachyon_bundle(
+        &self,
+    ) -> Option<zcash_tachyon::Bundle<ZatBalance>> {
+        None
+    }
 }

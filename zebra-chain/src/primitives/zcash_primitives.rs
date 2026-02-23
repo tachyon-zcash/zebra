@@ -142,6 +142,7 @@ impl zp_tx::Authorization for PrecomputedAuth {
     type TransparentAuth = TransparentAuth;
     type SaplingAuth = sapling_crypto::bundle::Authorized;
     type OrchardAuth = orchard::bundle::Authorized;
+    type TachyonAuth = zcash_tachyon::BindingSignature;
 
     #[cfg(zcash_unstable = "zfuture")]
     type TzeAuth = zp_tx::components::tze::Authorized;
@@ -291,6 +292,12 @@ impl PrecomputedTxData {
         &self,
     ) -> Option<sapling_crypto::Bundle<sapling_crypto::bundle::Authorized, ZatBalance>> {
         self.tx_data.sapling_bundle().cloned()
+    }
+
+    pub fn tachyon_bundle(
+        &self
+    ) -> Option<zcash_tachyon::Bundle<ZatBalance>> {
+        self.tx_data.tachyon_bundle().cloned()
     }
 }
 

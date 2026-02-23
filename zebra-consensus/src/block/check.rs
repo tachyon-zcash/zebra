@@ -68,91 +68,15 @@ pub fn coinbase_is_first(block: &Block) -> Result<Arc<transaction::Transaction>,
     Ok(first.clone())
 }
 
-/// Checks tachyon aggregation rules for blocks with tachyon transactions.
+/// Validates and verifies all tachyon aggregate proofs in the block.
 /// 
-/// Enforces that every sequence of unstamped tachyon transactions must be followed
-/// by a stamped transaction that aggregates their actions. Stamped transactions
-/// have tachyon_shielded_data.stamp = Some(...), unstamped have stamp = None.
+/// This function combines structural validation and cryptographic verification:
+/// 1. Ensures every sequence of unstamped tachyon transactions is followed by a stamped transaction
+/// 2. For each stamped transaction, verifies its proof against actions from itself and following unstamped transactions
 ///
-/// Returns `Ok(())` if the tachyon aggregation rules are satisfied.
+/// Returns `Ok(())` if all tachyon aggregation rules are satisfied and proofs verify.
 #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-pub fn coinbase_has_tachyon_aggregate(block: &Block) -> Result<(), BlockError> {
-    use zebra_chain::transaction::Transaction;
-    
-    let transactions = &block.transactions;
-    let mut i = 0;
-    
-    while i < transactions.len() {
-        let tx = &transactions[i];
-        
-        // Check if this transaction has tachyon data
-        if let Transaction::V6 { tachyon_shielded_data: Some(tachyon_data), .. } = tx.as_ref() {
-            if tachyon_data.stamp.is_some() {
-                // This is a stamped transaction - continue to next transaction
-                i += 1;
-                continue;
-            }
-            
-            // This is an unstamped transaction - find the next stamped transaction
-            let mut unstamped_count = 0;
-            let mut j = i;
-            
-            // Count consecutive unstamped tachyon transactions
-            while j < transactions.len() {
-                if let Transaction::V6 { tachyon_shielded_data: Some(data), .. } = transactions[j].as_ref() {
-                    if data.stamp.is_some() {
-                        // Found a stamped transaction
-                        break;
-                    }
-                    unstamped_count += 1;
-                } else {
-                    // Non-tachyon transaction, skip
-                }
-                j += 1;
-            }
-            
-            // Ensure we found a stamped transaction after unstamped ones
-            if unstamped_count > 0 {
-                if j >= transactions.len() {
-                    return Err(BlockError::Other(
-                        "Unstamped tachyon transactions must be followed by a stamped transaction".to_string()
-                    ));
-                }
-                
-                // Verify the stamped transaction at position j exists
-                if let Transaction::V6 { tachyon_shielded_data: Some(data), .. } = transactions[j].as_ref() {
-                    if data.stamp.is_none() {
-                        return Err(BlockError::Other(
-                            "Expected stamped transaction after unstamped sequence".to_string()
-                        ));
-                    }
-                } else {
-                    return Err(BlockError::Other(
-                        "Expected stamped tachyon transaction after unstamped sequence".to_string()
-                    ));
-                }
-            }
-            
-            // Move to the stamped transaction
-            i = j + 1;
-        } else {
-            // Non-tachyon transaction, continue
-            i += 1;
-        }
-    }
-    
-    Ok(())
-}
-
-/// Cryptographically verifies all tachyon aggregate proofs in the block.
-/// 
-/// For each stamped transaction, this function calls `verify()` on its proof,
-/// using tachygrams from the stamp and actions from all unstamped transactions
-/// following its position up to the next stamped transaction.
-///
-/// Returns `Ok(())` if all proof verifications succeed.
-#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-pub fn verify_tachyon_aggregate(block: &Block) -> Result<(), BlockError> {
+pub fn verify_tachyon_aggregates(block: &Block) -> Result<(), BlockError> {
     use zebra_chain::transaction::Transaction;
     use zebra_chain::tachyon::{Action, Tachygram, Anchor};
     
@@ -160,10 +84,10 @@ pub fn verify_tachyon_aggregate(block: &Block) -> Result<(), BlockError> {
     let mut i = 0;
     
     while i < transactions.len() {
-        // Find stamped transactions
+        // Check if this transaction has tachyon data
         if let Transaction::V6 { tachyon_shielded_data: Some(tachyon_data), .. } = transactions[i].as_ref() {
             if let Some(stamp) = &tachyon_data.stamp {
-                // This is a stamped transaction - collect actions from following unstamped transactions
+                // This is a stamped transaction - collect actions and verify proof
                 let mut actions_to_verify = Vec::<Action>::new();
                 
                 // Include actions from the stamped transaction itself
@@ -196,8 +120,29 @@ pub fn verify_tachyon_aggregate(block: &Block) -> Result<(), BlockError> {
                 // Move past the unstamped transactions we just processed
                 i = j;
             } else {
-                // Unstamped transaction, continue
-                i += 1;
+                // This is an unstamped transaction - find the next stamped transaction
+                let mut j = i;
+                
+                // Skip consecutive unstamped tachyon transactions
+                while j < transactions.len() {
+                    if let Transaction::V6 { tachyon_shielded_data: Some(data), .. } = transactions[j].as_ref() {
+                        if data.stamp.is_some() {
+                            // Found a stamped transaction
+                            break;
+                        }
+                    }
+                    j += 1;
+                }
+                
+                // Ensure we found a stamped transaction after unstamped ones
+                if j >= transactions.len() {
+                    return Err(BlockError::Other(
+                        "Unstamped tachyon transactions must be followed by a stamped transaction".to_string()
+                    ));
+                }
+                
+                // Move to the stamped transaction (it will be processed in next iteration)
+                i = j;
             }
         } else {
             // Non-tachyon transaction, continue
