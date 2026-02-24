@@ -36,13 +36,3 @@ just push ragu my-ragu my-feature-branch
 
 The `git subtree push` command filters workspace commits down to only those touching the given prefix, rewrites paths, and pushes — resulting in a normal-looking PR with individual commits.
 
-## Cross-project Cargo builds
-
-`.cargo/config.toml` patches `librustzcash` dependencies in `zebra` and `zcash-devtool` to use the local `librustzcash/` subtree. This means changes to `librustzcash/` are picked up automatically when building those projects.
-
-To build across projects, run cargo from within the relevant subtree directory:
-
-```sh
-cargo build --manifest-path zcash-devtool/Cargo.toml
-cargo build --manifest-path zebra/Cargo.toml
-```
