@@ -1,0 +1,33 @@
+# Redirect librustzcash git dependencies to the local subtree.
+# zcash-devtool patches crates-io → zcash/librustzcash; we patch that source → local.
+# zebra may reference tachyon-zcash/librustzcash directly.
+
+[patch."https://github.com/zcash/librustzcash"]
+equihash              = { path = "../librustzcash/components/equihash" }
+f4jumble              = { path = "../librustzcash/components/f4jumble" }
+pczt                  = { path = "../librustzcash/pczt" }
+zcash_address         = { path = "../librustzcash/components/zcash_address" }
+zcash_client_backend  = { path = "../librustzcash/zcash_client_backend" }
+zcash_client_sqlite   = { path = "../librustzcash/zcash_client_sqlite" }
+zcash_encoding        = { path = "../librustzcash/components/zcash_encoding" }
+zcash_keys            = { path = "../librustzcash/zcash_keys" }
+zcash_primitives      = { path = "../librustzcash/zcash_primitives" }
+zcash_proofs          = { path = "../librustzcash/zcash_proofs" }
+zcash_protocol        = { path = "../librustzcash/components/zcash_protocol" }
+zcash_transparent     = { path = "../librustzcash/zcash_transparent" }
+zip321                = { path = "../librustzcash/components/zip321" }
+
+[patch."https://github.com/tachyon-zcash/librustzcash"]
+equihash              = { path = "../librustzcash/components/equihash" }
+f4jumble              = { path = "../librustzcash/components/f4jumble" }
+pczt                  = { path = "../librustzcash/pczt" }
+zcash_address         = { path = "../librustzcash/components/zcash_address" }
+zcash_client_backend  = { path = "../librustzcash/zcash_client_backend" }
+zcash_client_sqlite   = { path = "../librustzcash/zcash_client_sqlite" }
+zcash_encoding        = { path = "../librustzcash/components/zcash_encoding" }
+zcash_keys            = { path = "../librustzcash/zcash_keys" }
+zcash_primitives      = { path = "../librustzcash/zcash_primitives" }
+zcash_proofs          = { path = "../librustzcash/zcash_proofs" }
+zcash_protocol        = { path = "../librustzcash/components/zcash_protocol" }
+zcash_transparent     = { path = "../librustzcash/zcash_transparent" }
+zip321                = { path = "../librustzcash/components/zip321" }
