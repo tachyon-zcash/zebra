@@ -1,0 +1,22 @@
+\F:\mathbb{F}
+\G:\mathbb{G}
+\Rel:\mathcal{R}
+\Cir:\mathcal{C}
+\identity:\mathcal{O}
+\v:\mathbf{#1}
+\rv:\mathbf{\hat{#1}}
+\vp:\mathbf{#1}_{#2}
+\dot:\langle #1 , #2 \rangle
+\revdot:\, \langle \kern-0.5em \langle \kern0.1em #1, #2 \kern0.1em \rangle \kern-0.5em \rangle \,
+\conv:\revdot{#1}{#2}
+\endo:\underbar{#1}
+\inst:\mathtt{x}
+\wit:\mathtt{w}
+\sample:\overset{\$}{\leftarrow}
+\endo:\underbar{#1}
+\iseq:\overset{?}{=}
+\com:\mathsf{Commit}
+\nil:\bot
+\acc:\mathsf{acc}
+\pf:\mathsf{pf}
+\aux:\mathsf{aux}

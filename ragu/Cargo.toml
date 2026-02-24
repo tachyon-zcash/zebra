@@ -1,0 +1,96 @@
+[package]
+name = "ragu"
+version.workspace = true
+authors.workspace = true
+description = """
+Proof-carrying data (PCD) framework for Rust
+"""
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+readme = "README.md"
+repository.workspace = true
+documentation = "https://docs.rs/ragu"
+categories = ["cryptography", "mathematics", "algorithms", "science", "no-std"]
+keywords = []
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--html-in-header", "katex-header.html"]
+all-features = true
+
+[features]
+default = []
+
+[lib]
+bench = false
+
+[dependencies]
+ragu_core = { path = "crates/ragu_core", version = "0.0.0" }
+ragu_circuits = { path = "crates/ragu_circuits", version = "0.0.0" }
+ragu_arithmetic = { path = "crates/ragu_arithmetic", version = "0.0.0" }
+ragu_primitives = { path = "crates/ragu_primitives", version = "0.0.0" }
+ragu_pcd = { path = "crates/ragu_pcd", version = "0.0.0" }
+
+[workspace]
+members = [
+  "crates/ragu_arithmetic",
+  "crates/ragu_circuits",
+  "crates/ragu_core",
+  "crates/ragu_gadgets",
+  "crates/ragu_macros",
+  "crates/ragu_pasta",
+  "crates/ragu_primitives",
+  "crates/ragu_pcd",
+  "crates/ragu_testing",
+]
+
+resolver = "2"
+
+# The profile that 'cargo dist' will build with
+[profile.dist]
+inherits = "release"
+
+[workspace.package]
+version = "0.0.0"
+authors = ["Sean Bowe <ewillbefull@gmail.com>"]
+license = "MIT OR Apache-2.0"
+edition = "2024"
+rust-version = "1.90"
+repository = "https://github.com/tachyon-zcash/ragu"
+
+[workspace.dependencies]
+ff = { version = "0.14.0-pre.0", default-features = false }
+group = { version = "0.14.0-pre.0", default-features = false }
+pasta_curves = "0.5.1"
+rand = "0.10"
+lazy_static = "1.5.0"
+proptest = "1.7.0"
+gungraun = "0.17.0"
+blake2b_simd = "1.0"
+
+[patch.crates-io]
+# `ebfull/addchain` branch `bump-num-bigint` is a replica of
+# https://github.com/str4d/addchain/pull/3
+# that updates `addchain` to use `num_bigint 0.4`
+addchain = { git = "https://github.com/ebfull/addchain", rev = "da4099a81bc29c895f3ca0ebcaae21c860494c12" }
+
+# `ebfull/ff` branch `release-0.14.0-with-rand-0.10` is a fork of
+# https://github.com/zkcrypto/ff/pull/130
+# which updates `ff` to bump `num-bigint` and `syn`
+# then merges https://github.com/zkcrypto/ff/pull/149
+# dependencies to align with our local usage in `ragu_macros`
+ff = { git = "https://github.com/ebfull/ff", branch = "release-0.14.0-with-rand-0.10" }
+
+# `ebfull/group` branch `release-0.14.0-with-rand-0.10` is a fork of
+# https://github.com/zkcrypto/group/pull/63
+# which updates `group` to bump `ff` to `0.14` (as well as other
+# changes, including bumping to `rand 0.9`)
+# then merges https://github.com/zkcrypto/group/pull/71
+group = { git = "https://github.com/ebfull/group", branch = "release-0.14.0-with-rand-0.10" }
+
+# `ebfull/pasta_curves` branch `ff-0.14-with-rand-0.10` is a replica of
+# https://github.com/zcash/pasta_curves/pull/86
+# that updates `pasta_curves` to use `ff`/`group` `0.14.0-pre.0`
+# then bumps to `rand 0.9`.
+pasta_curves = { git = "https://github.com/ebfull/pasta_curves", branch = "ff-0.14-with-rand-0.10" }

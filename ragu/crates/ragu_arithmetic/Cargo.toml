@@ -1,0 +1,40 @@
+[package]
+name = "ragu_arithmetic"
+version.workspace = true
+authors.workspace = true
+description = """
+Fundamental arithmetic traits and utilities for the Ragu project
+"""
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+readme = "README.md"
+repository.workspace = true
+documentation = "https://docs.rs/ragu_arithmetic"
+categories = ["cryptography", "mathematics", "algorithms", "science", "no-std"]
+keywords = []
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--html-in-header", "katex-header.html"]
+all-features = true
+
+[features]
+default = []
+
+[lib]
+bench = false
+
+[dependencies]
+ff = { workspace = true }
+pasta_curves = { workspace = true }
+ragu_macros = { path = "../ragu_macros", version = "0.0.0" }
+rand = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+gungraun = { workspace = true }
+
+[[bench]]
+name = "arithmetic"
+harness = false

@@ -1,0 +1,51 @@
+[package]
+name = "ragu_primitives"
+version.workspace = true
+authors.workspace = true
+description = """
+Intended for internal use in the Ragu project
+"""
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+readme = "README.md"
+repository.workspace = true
+documentation = "https://docs.rs/ragu_primitives"
+categories = [
+  "cryptography",
+  "mathematics",
+  "algorithms",
+  "development-tools",
+  "no-std",
+]
+keywords = []
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--html-in-header", "katex-header.html"]
+all-features = true
+
+[features]
+default = []
+
+[lib]
+bench = false
+
+[dependencies]
+ragu_arithmetic = { path = "../ragu_arithmetic", version = "0.0.0" }
+ff = { workspace = true }
+ragu_core = { path = "../ragu_core", version = "0.0.0" }
+thiserror = "2.0.12"
+
+# Needed for the `Write` derive macro.
+ragu_macros = { path = "../ragu_macros", version = "0.0.0" }
+
+[dev-dependencies]
+rand = { workspace = true }
+group = { workspace = true }
+ragu_pasta = { path = "../ragu_pasta", version = "0.0.0", features = ["baked"] }
+gungraun = { workspace = true }
+
+[[bench]]
+name = "primitives"
+harness = false

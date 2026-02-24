@@ -1,0 +1,28 @@
+[package]
+name = "ragu_gadgets"
+version.workspace = true
+authors.workspace = true
+description = """
+WIP
+"""
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+readme = "README.md"
+repository.workspace = true
+documentation = "https://docs.rs/ragu"
+categories = []
+keywords = []
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--html-in-header", "katex-header.html"]
+all-features = true
+
+[features]
+default = []
+
+[lib]
+bench = false
+
+[dependencies]
