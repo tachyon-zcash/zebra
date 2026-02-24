@@ -1,0 +1,45 @@
+[package]
+name = "ragu_circuits"
+version.workspace = true
+authors.workspace = true
+description = """
+Intended for internal use in the Ragu project
+"""
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+readme = "README.md"
+repository.workspace = true
+documentation = "https://docs.rs/ragu_circuits"
+categories = ["cryptography", "mathematics", "algorithms", "science", "no-std"]
+keywords = []
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--html-in-header", "katex-header.html"]
+all-features = true
+
+[features]
+default = []
+
+[lib]
+bench = false
+
+[dependencies]
+ragu_arithmetic = { path = "../ragu_arithmetic", version = "0.0.0" }
+blake2b_simd = { workspace = true }
+ff = { workspace = true }
+group = { workspace = true }
+ragu_core = { path = "../ragu_core", version = "0.0.0" }
+ragu_primitives = { path = "../ragu_primitives", version = "0.0.0" }
+rand = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+gungraun = { workspace = true }
+ragu_pasta = { path = "../ragu_pasta", version = "0.0.0", features = ["baked"] }
+ragu_testing = { path = "../ragu_testing", version = "0.0.0" }
+
+[[bench]]
+name = "circuits"
+harness = false

@@ -1,0 +1,84 @@
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - '**/*.rs'
+              - '**/Cargo.toml'
+              - '**/Cargo.lock'
+              - 'rust-toolchain.toml'
+              - '.github/workflows/bench.yml'
+              - '.github/actions/**'
+
+  bench:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: ./.github/actions/rust-setup
+        with:
+          cache-suffix: bench
+          cargo-tools: gungraun-runner@0.17.0
+          apt-packages: valgrind
+
+      - name: Load baseline
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@v5
+        with:
+          path: target/gungraun
+          key: never-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: bench-${{ github.event.pull_request.base.sha }}
+
+      - name: Clean benchmark summaries
+        run: |
+          mkdir -p target/gungraun
+          find target/gungraun -name 'summary.json' -delete
+
+      - name: Run benchmarks
+        run: cargo bench --workspace --all-features --locked -- --save-summary=json
+
+      - name: Upload benchmark results artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v5
+        with:
+          name: gungraun-results
+          path: target/gungraun
+          retention-days: 1
+
+      - name: Save baseline
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v5
+        with:
+          path: target/gungraun
+          key: bench-${{ github.sha }}
