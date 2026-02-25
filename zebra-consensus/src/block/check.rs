@@ -68,6 +68,91 @@ pub fn coinbase_is_first(block: &Block) -> Result<Arc<transaction::Transaction>,
     Ok(first.clone())
 }
 
+/// Validates and verifies all tachyon aggregate proofs in the block.
+/// 
+/// This function combines structural validation and cryptographic verification:
+/// 1. Ensures every sequence of unstamped tachyon transactions is followed by a stamped transaction
+/// 2. For each stamped transaction, verifies its proof against actions from itself and following unstamped transactions
+///
+/// Returns `Ok(())` if all tachyon aggregation rules are satisfied and proofs verify.
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+pub fn verify_tachyon_aggregates(block: &Block) -> Result<(), BlockError> {
+    use zebra_chain::transaction::Transaction;
+    use zebra_chain::tachyon::{Action, Tachygram, Anchor};
+    
+    let transactions = &block.transactions;
+    let mut i = 0;
+    
+    while i < transactions.len() {
+        // Check if this transaction has tachyon data
+        if let Transaction::V6 { tachyon_shielded_data: Some(tachyon_data), .. } = transactions[i].as_ref() {
+            if let Some(stamp) = &tachyon_data.stamp {
+                // This is a stamped transaction - collect actions and verify proof
+                let mut actions_to_verify = Vec::<Action>::new();
+                
+                // Include actions from the stamped transaction itself
+                actions_to_verify.extend_from_slice(&tachyon_data.actions);
+                
+                // Collect actions from unstamped transactions following this stamped one
+                let mut j = i + 1;
+                while j < transactions.len() {
+                    if let Transaction::V6 { tachyon_shielded_data: Some(data), .. } = transactions[j].as_ref() {
+                        if data.stamp.is_some() {
+                            // Found next stamped transaction, stop collecting
+                            break;
+                        }
+                        // This is an unstamped transaction, collect its actions
+                        actions_to_verify.extend_from_slice(&data.actions);
+                    }
+                    j += 1;
+                }
+                
+                // Verify the stamp's proof against collected actions
+                let tachygrams: &[Tachygram] = &stamp.tachygrams;
+                let anchor: Anchor = stamp.anchor;
+                
+                stamp.proof
+                    .verify(&actions_to_verify, tachygrams, anchor)
+                    .map_err(|_| BlockError::Other(
+                        format!("Tachyon aggregate proof verification failed for transaction at position {}", i)
+                    ))?;
+                
+                // Move past the unstamped transactions we just processed
+                i = j;
+            } else {
+                // This is an unstamped transaction - find the next stamped transaction
+                let mut j = i;
+                
+                // Skip consecutive unstamped tachyon transactions
+                while j < transactions.len() {
+                    if let Transaction::V6 { tachyon_shielded_data: Some(data), .. } = transactions[j].as_ref() {
+                        if data.stamp.is_some() {
+                            // Found a stamped transaction
+                            break;
+                        }
+                    }
+                    j += 1;
+                }
+                
+                // Ensure we found a stamped transaction after unstamped ones
+                if j >= transactions.len() {
+                    return Err(BlockError::Other(
+                        "Unstamped tachyon transactions must be followed by a stamped transaction".to_string()
+                    ));
+                }
+                
+                // Move to the stamped transaction (it will be processed in next iteration)
+                i = j;
+            }
+        } else {
+            // Non-tachyon transaction, continue
+            i += 1;
+        }
+    }
+    
+    Ok(())
+}
+
 /// Returns `Ok(ExpandedDifficulty)` if the`difficulty_threshold` of `header` is at least as difficult as
 /// the target difficulty limit for `network` (PoWLimit)
 ///
