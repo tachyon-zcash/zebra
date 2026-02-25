@@ -60,6 +60,9 @@ use crate::{
     Error,
 };
 
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+use crate::tachyon;
+
 /// A Zcash transaction.
 ///
 /// A transaction is an encoded data structure that facilitates the transfer of
@@ -171,6 +174,8 @@ pub enum Transaction {
         sapling_shielded_data: Option<sapling::ShieldedData<sapling::SharedAnchor>>,
         /// The orchard data for this transaction, if any.
         orchard_shielded_data: Option<orchard::ShieldedData>,
+        /// The Tachyon data for this transaction, if any
+        tachyon_shielded_data: Option<tachyon::shielded_data::ShieldedData>,
     },
 }
 
