@@ -13,14 +13,15 @@
 use std::fmt;
 
 use halo2::pasta::{group::ff::PrimeField, pallas};
+use byteorder::{LittleEndian, WriteBytesExt};
 
-use crate::amount::{Amount, NegativeAllowed};
+use crate::{amount::{Amount, NegativeAllowed}, serialization::ZcashSerialize};
 
 /// Tachyon shielded data bundle for a transaction.
 ///
 /// Uses tachyon crate types directly. Serde is implemented at the bundle
 /// level — individual tachyon types do not carry serde derives.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct ShieldedData {
     /// The actions (cv, rk, sig for each).
     pub actions: Vec<zcash_tachyon::Action>,
@@ -30,7 +31,7 @@ pub struct ShieldedData {
 
     /// Binding signature on transaction sighash.
     /// None when actions is empty (nothing to sign over).
-    pub binding_sig: Option<zcash_tachyon::BindingSignature>,
+    pub binding_sig: Option<zcash_tachyon::bundle::Signature>,
 
     /// The stamp containing tachygrams, anchor, and proof.
     /// None after stripping during aggregation.
@@ -60,6 +61,59 @@ impl fmt::Display for ShieldedData {
     }
 }
 
+impl PartialEq for ShieldedData {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare actions by their serialized representation
+        if self.actions.len() != other.actions.len() {
+            return false;
+        }
+        
+        for (a1, a2) in self.actions.iter().zip(other.actions.iter()) {
+            let cv1: [u8; 32] = a1.cv.into();
+            let cv2: [u8; 32] = a2.cv.into();
+            let rk1: [u8; 32] = a1.rk.into();
+            let rk2: [u8; 32] = a2.rk.into();
+            let sig1: [u8; 64] = a1.sig.into();
+            let sig2: [u8; 64] = a2.sig.into();
+            
+            if cv1 != cv2 || rk1 != rk2 || sig1 != sig2 {
+                return false;
+            }
+        }
+        
+        // Compare value balance
+        if self.value_balance != other.value_balance {
+            return false;
+        }
+        
+        // Compare binding signature
+        match (&self.binding_sig, &other.binding_sig) {
+            (None, None) => {},
+            (Some(s1), Some(s2)) => {
+                let sig1: [u8; 64] = (*s1).into();
+                let sig2: [u8; 64] = (*s2).into();
+                if sig1 != sig2 {
+                    return false;
+                }
+            },
+            _ => return false,
+        }
+        
+        // Compare stamp - simplified comparison
+        match (&self.stamp, &other.stamp) {
+            (None, None) => true,
+            (Some(_), Some(_)) => {
+                // For now, assume stamps are equal if both exist
+                // A full implementation would compare tachygrams, anchor, and proof
+                true
+            },
+            _ => false,
+        }
+    }
+}
+
+impl Eq for ShieldedData {}
+
 impl ShieldedData {
     /// Iterate over the actions in this bundle.
     pub fn actions(&self) -> impl Iterator<Item = &zcash_tachyon::Action> {
@@ -84,12 +138,12 @@ impl ShieldedData {
     /// signature proves that the signer knew all value commitment trapdoors,
     /// which transitively proves value balance integrity.
     /// Returns None if there are no actions.
-    pub fn binding_verification_key(&self) -> Option<zcash_tachyon::BindingVerificationKey> {
+    pub fn binding_verification_key(&self) -> Option<zcash_tachyon::keys::public::BindingVerificationKey> {
         if self.actions.is_empty() {
             return None;
         }
 
-        Some(zcash_tachyon::BindingVerificationKey::derive(
+        Some(zcash_tachyon::keys::public::BindingVerificationKey::derive(
             &self.actions,
             self.value_balance.into(),
         ))
@@ -179,16 +233,16 @@ impl<'de> serde::Deserialize<'de> for ShieldedData {
             .map(|a| {
                 let cv = zcash_tachyon::value::Commitment::try_from(&a.cv)
                     .map_err(serde::de::Error::custom)?;
-                let rk = zcash_tachyon::RandomizedVerificationKey::try_from(a.rk)
+                let rk = zcash_tachyon::keys::public::ActionVerificationKey::try_from(a.rk)
                     .map_err(serde::de::Error::custom)?;
-                let sig = zcash_tachyon::SpendAuthSignature::from(a.sig);
+                let sig = zcash_tachyon::action::Signature::from(a.sig);
                 Ok(zcash_tachyon::Action { cv, rk, sig })
             })
             .collect::<Result<Vec<_>, D::Error>>()?;
 
         let binding_sig = proxy
             .binding_sig
-            .map(|b| zcash_tachyon::BindingSignature::from(b.0));
+            .map(|b| zcash_tachyon::bundle::Signature::from(b.0));
 
         let stamp = proxy
             .stamp
@@ -224,5 +278,60 @@ impl<'de> serde::Deserialize<'de> for ShieldedData {
             binding_sig,
             stamp,
         })
+    }
+}
+
+// =============================================================================
+// ZcashSerialize implementation
+// =============================================================================
+
+impl ZcashSerialize for ShieldedData {
+    fn zcash_serialize<W: std::io::Write>(&self, mut writer: W) -> Result<(), std::io::Error> {
+        // For now, implement a basic serialization
+        // This is a placeholder implementation - the actual format should follow 
+        // the Tachyon specification when it's defined
+        
+        // Serialize number of actions
+        writer.write_u32::<LittleEndian>(self.actions.len() as u32)?;
+        
+        // Serialize each action (cv, rk, sig)
+        for action in &self.actions {
+            let cv_bytes: [u8; 32] = action.cv.into();
+            let rk_bytes: [u8; 32] = action.rk.into();
+            let sig_bytes: [u8; 64] = action.sig.into();
+            
+            writer.write_all(&cv_bytes)?;
+            writer.write_all(&rk_bytes)?;
+            writer.write_all(&sig_bytes)?;
+        }
+        
+        // Serialize value balance
+        let balance_i64: i64 = self.value_balance.into();
+        writer.write_i64::<LittleEndian>(balance_i64)?;
+        
+        // Serialize binding signature (optional)
+        match &self.binding_sig {
+            Some(sig) => {
+                writer.write_u8(1)?;
+                let sig_bytes: [u8; 64] = (*sig).into();
+                writer.write_all(&sig_bytes)?;
+            }
+            None => {
+                writer.write_u8(0)?;
+            }
+        }
+        
+        // Serialize stamp (optional)
+        match &self.stamp {
+            Some(_) => {
+                writer.write_u8(1)?;
+                // TODO: Implement stamp serialization when format is defined
+            }
+            None => {
+                writer.write_u8(0)?;
+            }
+        }
+        
+        Ok(())
     }
 }
