@@ -6719,6 +6719,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "zcash_tachyon"
+version = "0.0.0"
+dependencies = [
+ "bitvec",
+ "blake2b_simd",
+ "ff",
+ "group",
+ "pasta_curves",
+ "proptest",
+ "rand 0.8.5",
+ "reddsa",
+]
+
+[[package]]
 name = "zcash_transparent"
 version = "0.6.3"
 dependencies = [
@@ -6805,6 +6819,7 @@ dependencies = [
  "zcash_primitives",
  "zcash_protocol",
  "zcash_script",
+ "zcash_tachyon",
  "zcash_transparent",
  "zebra-test",
 ]
