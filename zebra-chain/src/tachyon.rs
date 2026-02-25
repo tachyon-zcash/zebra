@@ -40,9 +40,12 @@ pub mod shielded_data;
 
 // Re-export protocol types from tachyon crate
 pub use zcash_tachyon::{
-    Action, Anchor, BindingSignature, BindingVerificationKey, Epoch, Proof,
-    RandomizedVerificationKey, SpendAuthSignature, Stamp, Tachygram,
+    Action, Anchor, Epoch, Proof, Stamp, Tachygram,
 };
+pub use zcash_tachyon::keys::public::BindingVerificationKey;
+pub use zcash_tachyon::action::Signature as SpendAuthSignature;
+pub use zcash_tachyon::bundle::Signature as BindingSignature;
+pub use zcash_tachyon::keys::public::ActionVerificationKey as RandomizedVerificationKey;
 pub use zcash_tachyon::value::Commitment as ValueCommitment;
 
 // Zebra-specific types
