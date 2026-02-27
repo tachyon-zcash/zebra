@@ -98,6 +98,7 @@ impl SaplingExtractedNoteCommitment {
     }
 }
 
+
 #[derive(Deserialize, Serialize)]
 #[serde(remote = "sapling_crypto::Node")]
 pub struct Node {

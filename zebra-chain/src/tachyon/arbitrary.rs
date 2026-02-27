@@ -25,7 +25,7 @@ impl Arbitrary for ShieldedData {
             .prop_map(|(actions, vb, stamp)| {
                 let value_balance = Amount::try_from(vb % 1000).unwrap_or_else(|_| Amount::zero());
                 let binding_sig = if !actions.is_empty() {
-                    Some(zcash_tachyon::BindingSignature::from([0u8; 64]))
+                    Some(super::BindingSignature::from([0u8; 64]))
                 } else {
                     None
                 };
@@ -40,40 +40,43 @@ impl Arbitrary for ShieldedData {
     }
 }
 
-fn arb_action() -> impl Strategy<Value = zcash_tachyon::Action> {
+fn arb_action() -> impl Strategy<Value = super::Action> {
     (any::<bool>(), any::<[u8; 32]>(), any::<[u8; 64]>()).prop_map(
         |(use_identity, rk_bytes, sig_bytes)| {
+             // TODO: limited cv coverage; expand when upstream exposes more constructors
             let cv = if use_identity {
                 super::ValueCommitment::balance(0)
             } else {
                 super::ValueCommitment::balance(1)
             };
             // Fallback to a known-good key if random bytes are invalid
-            let rk = zcash_tachyon::RandomizedVerificationKey::try_from(rk_bytes).unwrap_or_else(|_| {
-                zcash_tachyon::RandomizedVerificationKey::try_from([1u8; 32]).unwrap()
+            let rk = super::RandomizedVerificationKey::try_from(rk_bytes).unwrap_or_else(|_| {
+                super::RandomizedVerificationKey::try_from([1u8; 32]).unwrap()
             });
-            let sig = zcash_tachyon::SpendAuthSignature::from(sig_bytes);
-            zcash_tachyon::Action { cv, rk, sig }
+            let sig = super::SpendAuthSignature::from(sig_bytes);
+            super::Action { cv, rk, sig }
         },
     )
 }
 
-fn arb_stamp() -> impl Strategy<Value = zcash_tachyon::Stamp> {
+fn arb_stamp() -> impl Strategy<Value = super::Stamp> {
     (
         proptest::collection::vec(arb_tachygram(), 0..20),
         arb_anchor(),
     )
-        .prop_map(|(tachygrams, anchor)| zcash_tachyon::Stamp {
+        .prop_map(|(tachygrams, anchor)| super::Stamp {
             tachygrams,
             anchor,
-            proof: zcash_tachyon::Proof::default(),
+            // TODO: Proof is a placeholder unit struct; revisit when it
+            // carries real proof content.
+            proof: super::Proof::default(),
         })
 }
 
-fn arb_tachygram() -> impl Strategy<Value = zcash_tachyon::Tachygram> {
-    any::<u64>().prop_map(|val| zcash_tachyon::Tachygram::from(pallas::Base::from(val)))
+fn arb_tachygram() -> impl Strategy<Value = super::Tachygram> {
+    any::<u64>().prop_map(|val| super::Tachygram::from(pallas::Base::from(val)))
 }
 
-fn arb_anchor() -> impl Strategy<Value = zcash_tachyon::Anchor> {
-    any::<u64>().prop_map(|val| zcash_tachyon::Anchor::from(pallas::Base::from(val)))
+fn arb_anchor() -> impl Strategy<Value = super::Anchor> {
+    any::<u64>().prop_map(|val| super::Anchor::from(pallas::Base::from(val)))
 }
