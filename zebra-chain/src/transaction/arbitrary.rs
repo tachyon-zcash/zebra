@@ -1220,7 +1220,7 @@ fn arb_tachyon_action() -> BoxedStrategy<zcash_tachyon::Action> {
 #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
 fn arb_tachyon_stamp() -> BoxedStrategy<zcash_tachyon::Stamp> {
     (
-        vec(arb_tachygram(), 1..MAX_ARBITRARY_ITEMS),
+        vec(arb_tachygram(), 0..MAX_ARBITRARY_ITEMS),
         arb_anchor(),
     )
         .prop_map(|(tachygrams, anchor)| zcash_tachyon::Stamp {
@@ -1259,7 +1259,7 @@ fn arb_anchor() -> BoxedStrategy<zcash_tachyon::Anchor> {
 #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
 fn arb_tachyon_bundle() -> BoxedStrategy<zcash_tachyon::Bundle<Option<zcash_tachyon::Stamp>>> {
     (
-        vec(arb_tachyon_action(), 1..MAX_ARBITRARY_ITEMS),
+        vec(arb_tachyon_action(), 0..MAX_ARBITRARY_ITEMS),
         any::<i64>(),
         vec(any::<u8>(), 64),
         option::of(arb_tachyon_stamp()),
