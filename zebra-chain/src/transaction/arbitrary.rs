@@ -6,6 +6,15 @@ use chrono::{TimeZone, Utc};
 use proptest::{array, collection::vec, option, prelude::*, test_runner::TestRunner};
 use reddsa::{orchard::Binding, Signature};
 
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+use group::prime::PrimeCurveAffine;
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+use group::ff::{FromUniformBytes, PrimeField};
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+use halo2::pasta::pallas;
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+use reddsa::{orchard::SpendAuth, SigningKey, VerificationKey};
+
 use crate::{
     amount::{self, Amount, NegativeAllowed, NonNegative},
     at_least_one,
@@ -174,6 +183,64 @@ impl Transaction {
                             None
                         } else {
                             orchard_shielded_data
+                        },
+                    }
+                },
+            )
+            .boxed()
+    }
+
+    /// Generate a proptest strategy for V6 Transactions
+    #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+    pub fn v6_strategy(ledger_state: LedgerState) -> BoxedStrategy<Self> {
+        (
+            NetworkUpgrade::branch_id_strategy(),
+            any::<LockTime>(),
+            any::<block::Height>(),
+            any::<Amount<NonNegative>>(),
+            transparent::Input::vec_strategy(&ledger_state, MAX_ARBITRARY_ITEMS),
+            vec(any::<transparent::Output>(), 0..MAX_ARBITRARY_ITEMS),
+            option::of(any::<sapling::ShieldedData<sapling::SharedAnchor>>()),
+            option::of(any::<orchard::ShieldedData>()),
+            option::of(arb_tachyon_bundle()),
+        )
+            .prop_map(
+                move |(
+                    network_upgrade,
+                    lock_time,
+                    expiry_height,
+                    zip233_amount,
+                    inputs,
+                    outputs,
+                    sapling_shielded_data,
+                    orchard_shielded_data,
+                    tachyon_shielded_data,
+                )| {
+                    Transaction::V6 {
+                        network_upgrade: if ledger_state.transaction_has_valid_network_upgrade() {
+                            ledger_state.network_upgrade()
+                        } else {
+                            network_upgrade
+                        },
+                        lock_time,
+                        expiry_height,
+                        zip233_amount,
+                        inputs,
+                        outputs,
+                        sapling_shielded_data: if ledger_state.height.is_min() {
+                            None
+                        } else {
+                            sapling_shielded_data
+                        },
+                        orchard_shielded_data: if ledger_state.height.is_min() {
+                            None
+                        } else {
+                            orchard_shielded_data
+                        },
+                        tachyon_shielded_data: if ledger_state.height.is_min() {
+                            None
+                        } else {
+                            tachyon_shielded_data
                         },
                     }
                 },
@@ -765,6 +832,8 @@ impl Arbitrary for Transaction {
             Some(3) => return Self::v3_strategy(ledger_state),
             Some(4) => return Self::v4_strategy(ledger_state),
             Some(5) => return Self::v5_strategy(ledger_state),
+            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+            Some(6) => return Self::v6_strategy(ledger_state),
             Some(_) => unreachable!("invalid transaction version in override"),
             None => {}
         }
@@ -778,12 +847,30 @@ impl Arbitrary for Transaction {
             NetworkUpgrade::Blossom | NetworkUpgrade::Heartwood | NetworkUpgrade::Canopy => {
                 Self::v4_strategy(ledger_state)
             }
+            #[cfg(not(all(zcash_unstable = "nu7", feature = "tx_v6")))]
             NetworkUpgrade::Nu5
             | NetworkUpgrade::Nu6
             | NetworkUpgrade::Nu6_1
             | NetworkUpgrade::Nu7 => prop_oneof![
                 Self::v4_strategy(ledger_state.clone()),
                 Self::v5_strategy(ledger_state)
+            ]
+            .boxed(),
+
+            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+            NetworkUpgrade::Nu5
+            | NetworkUpgrade::Nu6
+            | NetworkUpgrade::Nu6_1 => prop_oneof![
+                Self::v4_strategy(ledger_state.clone()),
+                Self::v5_strategy(ledger_state)
+            ]
+            .boxed(),
+
+            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+            NetworkUpgrade::Nu7 => prop_oneof![
+                Self::v4_strategy(ledger_state.clone()),
+                Self::v5_strategy(ledger_state.clone()),
+                Self::v6_strategy(ledger_state)
             ]
             .boxed(),
 
@@ -1093,4 +1180,100 @@ pub fn insert_fake_orchard_shielded_data(
         }
         _ => panic!("Fake V5 transaction is not V5"),
     }
+}
+
+// Tachyon proptest strategies
+
+/// Generate an arbitrary tachyon Action.
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+fn arb_tachyon_action() -> BoxedStrategy<zcash_tachyon::Action> {
+    (
+        vec(any::<u8>(), 64),  // for rk derivation
+        vec(any::<u8>(), 64),  // for action sig
+    )
+        .prop_map(|(rk_seed, sig_bytes)| {
+            let rk_seed: [u8; 64] = rk_seed.try_into().expect("vec is the correct length");
+            let sk_scalar = pallas::Scalar::from_uniform_bytes(&rk_seed);
+            let sk_bytes = sk_scalar.to_repr();
+            let sk = SigningKey::<SpendAuth>::try_from(sk_bytes).unwrap();
+            let pk = VerificationKey::<SpendAuth>::from(&sk);
+            let rk = zcash_tachyon::keys::public::ActionVerificationKey::try_from(
+                <[u8; 32]>::from(pk),
+            )
+            .unwrap();
+
+            let mut sig_arr = [0u8; 64];
+            sig_arr.copy_from_slice(&sig_bytes);
+
+            zcash_tachyon::Action {
+                cv: zcash_tachyon::value::Commitment::from(
+                    pasta_curves::EpAffine::identity(),
+                ),
+                rk,
+                sig: zcash_tachyon::action::Signature::from(sig_arr),
+            }
+        })
+        .boxed()
+}
+
+/// Generate an arbitrary tachyon Stamp.
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+fn arb_tachyon_stamp() -> BoxedStrategy<zcash_tachyon::Stamp> {
+    (
+        vec(arb_tachygram(), 0..MAX_ARBITRARY_ITEMS),
+        arb_anchor(),
+    )
+        .prop_map(|(tachygrams, anchor)| zcash_tachyon::Stamp {
+            tachygrams,
+            anchor,
+            proof: zcash_tachyon::Proof,
+        })
+        .boxed()
+}
+
+/// Generate an arbitrary tachyon Tachygram.
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+fn arb_tachygram() -> BoxedStrategy<zcash_tachyon::Tachygram> {
+    vec(any::<u8>(), 64)
+        .prop_map(|bytes| {
+            let bytes: [u8; 64] = bytes.try_into().expect("vec is the correct length");
+            let fp = pasta_curves::Fp::from_uniform_bytes(&bytes);
+            zcash_tachyon::Tachygram::from(fp)
+        })
+        .boxed()
+}
+
+/// Generate an arbitrary tachyon Anchor.
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+fn arb_anchor() -> BoxedStrategy<zcash_tachyon::Anchor> {
+    vec(any::<u8>(), 64)
+        .prop_map(|bytes| {
+            let bytes: [u8; 64] = bytes.try_into().expect("vec is the correct length");
+            let fp = pasta_curves::Fp::from_uniform_bytes(&bytes);
+            zcash_tachyon::Anchor::from(fp)
+        })
+        .boxed()
+}
+
+/// Generate an arbitrary tachyon Bundle with optional Stamp.
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+fn arb_tachyon_bundle() -> BoxedStrategy<zcash_tachyon::Bundle<Option<zcash_tachyon::Stamp>>> {
+    (
+        vec(arb_tachyon_action(), 0..MAX_ARBITRARY_ITEMS),
+        any::<i64>(),
+        vec(any::<u8>(), 64),
+        option::of(arb_tachyon_stamp()),
+    )
+        .prop_map(|(actions, value_balance, binding_sig_bytes, stamp)| {
+            let mut sig_arr = [0u8; 64];
+            sig_arr.copy_from_slice(&binding_sig_bytes);
+
+            zcash_tachyon::Bundle {
+                actions,
+                value_balance,
+                binding_sig: zcash_tachyon::bundle::Signature::from(sig_arr),
+                stamp,
+            }
+        })
+        .boxed()
 }
