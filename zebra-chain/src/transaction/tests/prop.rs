@@ -121,7 +121,15 @@ fn arbitrary_transaction_version_strategy() -> Result<()> {
     let _init_guard = zebra_test::init();
 
     // Update with new transaction versions as needed
-    let strategy = (1..5u32)
+    #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+    let strategy = (1..=6u32)
+        .prop_flat_map(|transaction_version| {
+            LedgerState::coinbase_strategy(None, transaction_version, false)
+        })
+        .prop_flat_map(|ledger_state| Transaction::vec_strategy(ledger_state, MAX_ARBITRARY_ITEMS));
+
+    #[cfg(not(all(zcash_unstable = "nu7", feature = "tx_v6")))]
+    let strategy = (1..=5u32)
         .prop_flat_map(|transaction_version| {
             LedgerState::coinbase_strategy(None, transaction_version, false)
         })
