@@ -7,6 +7,8 @@ use crate::BoxError;
 pub mod ed25519;
 pub mod groth16;
 pub mod halo2;
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+pub mod ragu;
 pub mod redjubjub;
 pub mod redpallas;
 pub mod sapling;

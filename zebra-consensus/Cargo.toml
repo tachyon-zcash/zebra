@@ -24,7 +24,7 @@ progress-bar = [
     "zebra-state/progress-bar",
 ]
 
-tx_v6 = ["zebra-chain/tx_v6", "zebra-state/tx_v6"]
+tx_v6 = ["zebra-chain/tx_v6", "zebra-state/tx_v6", "zcash_tachyon"]
 
 # Test-only features
 proptest-impl = ["proptest", "proptest-derive", "zebra-chain/proptest-impl", "zebra-state/proptest-impl"]
@@ -55,6 +55,7 @@ derive-getters = { workspace = true, features = ["auto_copy_getters"] }
 
 sapling-crypto = { workspace = true, features = ["multicore"]}
 orchard.workspace = true
+zcash_tachyon = { workspace = true, optional = true }
 
 zcash_proofs = { workspace = true, features = ["multicore", "bundled-prover"] }
 
