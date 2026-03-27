@@ -1431,6 +1431,7 @@ impl ZcashSerialize for zcash_tachyon::Proof {
 impl ZcashDeserialize for zcash_tachyon::Proof {
     fn zcash_deserialize<R: io::Read>(_reader: R) -> Result<Self, SerializationError> {
         // Proof is currently a stub, no deserialization needed yet  
+        //Ok(zcash_tachyon::Proof)
         Ok(zcash_tachyon::Proof)
     }
 }
