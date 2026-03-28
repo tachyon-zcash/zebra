@@ -22,7 +22,7 @@ resolver = "2"
 [workspace.dependencies]
 incrementalmerkletree = { version = "0.8.2", features = ["legacy-api"] }
 orchard = "0.12"
-zcash_tachyon = {git = "https://github.com/S1nus/tachyon.git", rev="fe985d6a3698964f1e0486261592923fd17bfad2"}
+zcash_tachyon = {git = "https://github.com/S1nus/tachyon.git", rev="d4f9c0bc21c81e0d78f1fc52af4073bfb65cd3c7"}
 sapling-crypto = "0.6"
 zcash_address = {git = "https://github.com/tachyon-zcash/librustzcash.git", branch = "main"}
 zcash_encoding = {git = "https://github.com/tachyon-zcash/librustzcash.git", branch = "main"}

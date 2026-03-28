@@ -1030,7 +1030,7 @@ impl ZcashDeserialize for Transaction {
                     outputs,
                     sapling_shielded_data,
                     orchard_shielded_data,
-                    tachyon_shielded_data
+                    tachyon_shielded_data,
                 })
             }
             (_, _) => Err(SerializationError::Parse("bad tx header")),
@@ -1183,7 +1183,7 @@ impl FromHex for SerializedTransaction {
 
 // Tachyon Bundle serialization implementations
 impl<S> ZcashSerialize for Option<zcash_tachyon::Bundle<S>>
-where 
+where
     S: ZcashSerialize + zcash_tachyon::bundle::StampState,
     zcash_tachyon::Bundle<S>: ZcashSerialize,
 {
@@ -1208,16 +1208,16 @@ where
     fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
         // Denoted as `nActionsTachyon` and `vActionsTachyon` in the spec
         self.actions.zcash_serialize(&mut writer)?;
-        
+
         // Denoted as `valueBalanceTachyon` in the spec
         writer.write_i64::<LittleEndian>(self.value_balance)?;
-        
+
         // Denoted as `bindingSigTachyon` in the spec
         self.binding_sig.zcash_serialize(&mut writer)?;
-        
+
         // Denoted as stamp data (stamp present or stripped)
         self.stamp.zcash_serialize(&mut writer)?;
-        
+
         Ok(())
     }
 }
@@ -1233,8 +1233,7 @@ where
         match flag {
             0 => Ok(None),
             1 => {
-                let actions: Vec<zcash_tachyon::Action> =
-                    (&mut reader).zcash_deserialize_into()?;
+                let actions: Vec<zcash_tachyon::Action> = (&mut reader).zcash_deserialize_into()?;
                 let value_balance = (&mut reader).read_i64::<LittleEndian>()?;
                 let binding_sig = (&mut reader).zcash_deserialize_into()?;
                 let stamp: S = (&mut reader).zcash_deserialize_into()?;
@@ -1298,7 +1297,7 @@ impl ZcashSerialize for zcash_tachyon::Action {
     fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
         // Serialize cv (value commitment)
         self.cv.zcash_serialize(&mut writer)?;
-        // Serialize rk (randomized verification key) 
+        // Serialize rk (randomized verification key)
         self.rk.zcash_serialize(&mut writer)?;
         // Serialize sig (spend auth signature)
         self.sig.zcash_serialize(&mut writer)?;
@@ -1311,7 +1310,7 @@ impl ZcashDeserialize for zcash_tachyon::Action {
         let cv = (&mut reader).zcash_deserialize_into()?;
         let rk = (&mut reader).zcash_deserialize_into()?;
         let sig = (&mut reader).zcash_deserialize_into()?;
-        
+
         Ok(zcash_tachyon::Action { cv, rk, sig })
     }
 }
@@ -1333,7 +1332,7 @@ impl ZcashDeserialize for zcash_tachyon::Stamp {
         let tachygrams = (&mut reader).zcash_deserialize_into()?;
         let anchor = (&mut reader).zcash_deserialize_into()?;
         let proof = (&mut reader).zcash_deserialize_into()?;
-        
+
         Ok(zcash_tachyon::Stamp {
             tachygrams,
             anchor,
@@ -1421,18 +1420,24 @@ impl ZcashDeserialize for zcash_tachyon::Anchor {
     }
 }
 
+/// Serialized size of a Tachyon proof in bytes.
+/// Matches `mock_ragu::proof::PROOF_SIZE_COMPRESSED`.
+const TACHYON_PROOF_SIZE: usize = 23_000;
+
 impl ZcashSerialize for zcash_tachyon::Proof {
-    fn zcash_serialize<W: io::Write>(&self, _writer: W) -> Result<(), io::Error> {
-        // Proof is currently a stub, no serialization needed yet
-        Ok(())
+    fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
+        let bytes = self.serialize();
+        writer.write_all(bytes.as_ref())
     }
 }
 
 impl ZcashDeserialize for zcash_tachyon::Proof {
-    fn zcash_deserialize<R: io::Read>(_reader: R) -> Result<Self, SerializationError> {
-        // Proof is currently a stub, no deserialization needed yet  
-        //Ok(zcash_tachyon::Proof)
-        Ok(zcash_tachyon::Proof)
+    fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
+        let mut bytes = vec![0u8; TACHYON_PROOF_SIZE];
+        reader.read_exact(&mut bytes)?;
+        let arr: [u8; TACHYON_PROOF_SIZE] = bytes.try_into().expect("vec is TACHYON_PROOF_SIZE");
+        zcash_tachyon::Proof::try_from(&arr)
+            .map_err(|_| SerializationError::Parse("invalid tachyon proof"))
     }
 }
 
@@ -1466,6 +1471,7 @@ impl ZcashSerialize for zcash_tachyon::keys::public::ActionVerificationKey {
 impl ZcashDeserialize for zcash_tachyon::keys::public::ActionVerificationKey {
     fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
         let bytes = reader.read_32_bytes()?;
-        Self::try_from(bytes).map_err(|_| SerializationError::Parse("invalid action verification key"))
+        Self::try_from(bytes)
+            .map_err(|_| SerializationError::Parse("invalid action verification key"))
     }
 }
