@@ -233,6 +233,14 @@ pub(crate) const CONSENSUS_BRANCH_IDS: &[(NetworkUpgrade, ConsensusBranchId)] = 
     (ZFuture, ConsensusBranchId(0xffffffff)),
 ];
 
+// Fail fast: building with NU7 enabled but without zebra-test would silently produce
+// a binary where Nu7.branch_id() returns None, causing runtime verification failures.
+#[cfg(all(zcash_unstable = "nu7", not(any(test, feature = "zebra-test"))))]
+compile_error!(
+    "Building with zcash_unstable=\"nu7\" requires the `zebra-test` feature \
+     to provide the NU7 consensus branch ID. Add `--features zebra-test`."
+);
+
 /// The target block spacing before Blossom.
 const PRE_BLOSSOM_POW_TARGET_SPACING: i64 = 150;
 

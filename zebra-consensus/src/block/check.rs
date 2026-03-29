@@ -344,7 +344,17 @@ pub fn subsidy_is_valid(
         //
         // [ZIP-271]: <https://zips.z.cash/zip-0271>
         // [ZIP-1016]: <https://zips.z.cash/zip-101>
-        if Some(height) == NetworkUpgrade::Nu6_1.activation_height(net) {
+        // Only check lockbox disbursements when NU6.1 is explicitly in the activation list.
+        // `activation_height()` falls back to the next upgrade's height when NU6.1 is not
+        // configured (e.g. on Regtest going straight from NU6 to NU7), which would incorrectly
+        // require disbursements from an unfunded deferred pool.
+        let nu6_1_explicitly_activated = net
+            .activation_list()
+            .values()
+            .any(|nu| *nu == NetworkUpgrade::Nu6_1);
+        if nu6_1_explicitly_activated
+            && Some(height) == NetworkUpgrade::Nu6_1.activation_height(net)
+        {
             let lockbox_disbursements = net.lockbox_disbursements(height);
 
             if lockbox_disbursements.is_empty() {
