@@ -528,6 +528,8 @@ fn log_network_upgrade_activation(upgrade: NetworkUpgrade, height: Height) {
             t1 = "💫 Tachyon 💫",
             t2 = name,
             t3 = height_str,
+            t4 = "",
+            t5 = "",
             width = content_width,
         ),
         // Generic banner for NU5, NU6, NU6.1, and future upgrades
