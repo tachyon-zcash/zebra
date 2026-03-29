@@ -127,6 +127,10 @@ pub async fn show_block_chain_progress(
     // The last time we logged an update.
     let mut last_log_time = Instant::now();
 
+    // The most recent network upgrade we've announced with ASCII art.
+    // Initialized to the current upgrade at genesis so we don't announce past upgrades on startup.
+    let mut last_announced_upgrade = None;
+
     #[cfg(feature = "progress-bar")]
     let block_bar = howudoin::new().label("Blocks");
     let mut is_chain_metrics_chan_closed = false;
@@ -176,6 +180,23 @@ pub async fn show_block_chain_progress(
                 last_state_change_height = current_height;
                 last_state_change_time = now;
                 last_state_change_instant = instant_now;
+            }
+
+            // Check for network upgrade activations and announce them with ASCII art.
+            //
+            // On re-orgs that drop below an upgrade's activation height, we reset
+            // the tracker so the upgrade gets re-announced on the new fork.
+            let current_upgrade = network_upgrade;
+            if let Some(announced) = last_announced_upgrade {
+                if current_upgrade < announced {
+                    // Re-org dropped us below the last announced upgrade.
+                    // Reset so we re-announce if we cross it again.
+                    last_announced_upgrade = Some(current_upgrade);
+                }
+            }
+            if last_announced_upgrade.map_or(true, |announced| current_upgrade > announced) {
+                log_network_upgrade_activation(current_upgrade, current_height);
+                last_announced_upgrade = Some(current_upgrade);
             }
 
             if !is_chain_metrics_chan_closed {
@@ -360,4 +381,156 @@ pub async fn show_block_chain_progress(
 
         tokio::time::sleep(min(LOG_INTERVAL, PROGRESS_BAR_INTERVAL)).await;
     }
+}
+
+/// Logs ASCII art to celebrate a network upgrade activation.
+fn log_network_upgrade_activation(upgrade: NetworkUpgrade, height: Height) {
+    let name = upgrade.to_string().to_uppercase();
+    let height_str = format!("at height {}", height.0);
+
+    // Pad both lines to equal width for the box
+    let content_width = name.len().max(height_str.len()) + 8;
+    let name_line = format!("{:^width$}", name, width = content_width);
+    let height_line = format!("{:^width$}", height_str, width = content_width);
+    let border = "=".repeat(content_width + 2);
+
+    let art = match upgrade {
+        NetworkUpgrade::Genesis => format!(
+            r#"
+ +{border}+
+ |{name_line}|
+ |{height_line}|
+ |{blank}|
+ |{tree:^width$}|
+ |{trunk:^width$}|
+ +{border}+
+"#,
+            border = border,
+            name_line = name_line,
+            height_line = height_line,
+            blank = " ".repeat(content_width),
+            tree = "🌱",
+            trunk = "the beginning",
+            width = content_width,
+        ),
+        NetworkUpgrade::Sapling => format!(
+            r#"
+ +{border}+
+ |{name_line}|
+ |{height_line}|
+ |{blank}|
+ |{t1:^width$}|
+ |{t2:^width$}|
+ |{t3:^width$}|
+ |{t4:^width$}|
+ |{t5:^width$}|
+ +{border}+
+"#,
+            border = border,
+            name_line = name_line,
+            height_line = height_line,
+            blank = " ".repeat(content_width),
+            t1 = r"    /\    ",
+            t2 = r"   /  \   ",
+            t3 = r"  /~~~~\  ",
+            t4 = r" /~~~~~~\ ",
+            t5 = r"    ||    ",
+            width = content_width,
+        ),
+        NetworkUpgrade::Blossom => format!(
+            r#"
+ +{border}+
+ |{name_line}|
+ |{height_line}|
+ |{blank}|
+ |{f1:^width$}|
+ |{f2:^width$}|
+ |{f3:^width$}|
+ |{f4:^width$}|
+ |{f5:^width$}|
+ +{border}+
+"#,
+            border = border,
+            name_line = name_line,
+            height_line = height_line,
+            blank = " ".repeat(content_width),
+            f1 = r"  _ _ _  ",
+            f2 = r" ( _ _ ) ",
+            f3 = r"  ) _ (  ",
+            f4 = r" ( _ _ ) ",
+            f5 = r"    |    ",
+            width = content_width,
+        ),
+        NetworkUpgrade::Heartwood => format!(
+            r#"
+ +{border}+
+ |{name_line}|
+ |{height_line}|
+ |{blank}|
+ |{h1:^width$}|
+ |{h2:^width$}|
+ |{h3:^width$}|
+ |{h4:^width$}|
+ |{h5:^width$}|
+ +{border}+
+"#,
+            border = border,
+            name_line = name_line,
+            height_line = height_line,
+            blank = " ".repeat(content_width),
+            h1 = r"   /\  /\   ",
+            h2 = r"  /  \/  \  ",
+            h3 = r" /  /\/\  \ ",
+            h4 = r" \_/    \_/ ",
+            h5 = r"    \  /    ",
+            width = content_width,
+        ),
+        NetworkUpgrade::Canopy => format!(
+            r#"
+ +{border}+
+ |{name_line}|
+ |{height_line}|
+ |{blank}|
+ |{c1:^width$}|
+ |{c2:^width$}|
+ |{c3:^width$}|
+ |{c4:^width$}|
+ |{c5:^width$}|
+ |{c6:^width$}|
+ +{border}+
+"#,
+            border = border,
+            name_line = name_line,
+            height_line = height_line,
+            blank = " ".repeat(content_width),
+            c1 = r"  ^^  ^^  ^^  ",
+            c2 = r" /||\/||\/||\ ",
+            c3 = r"/ || \||/ || \",
+            c4 = r"  ||  ||  ||  ",
+            c5 = r"  ||  ||  ||  ",
+            c6 = r" _||__||__||_ ",
+            width = content_width,
+        ),
+        // Generic banner for NU5, NU6, NU6.1, NU7, and future upgrades
+        _ => format!(
+            r#"
+ +{border}+
+ |{blank}|
+ |{stars:^width$}|
+ |{name_line}|
+ |{height_line}|
+ |{stars:^width$}|
+ |{blank}|
+ +{border}+
+"#,
+            border = border,
+            name_line = name_line,
+            height_line = height_line,
+            blank = " ".repeat(content_width),
+            stars = "* * * * * * *",
+            width = content_width,
+        ),
+    };
+
+    info!("Network upgrade activated!\n{art}");
 }
