@@ -75,9 +75,9 @@ pub enum VerifyBlockError {
     #[error(transparent)]
     Time(zebra_chain::block::BlockTimeError),
 
+    /// Error when attempting to commit a block after semantic verification.
     #[error("unable to commit block after semantic verification: {0}")]
-    // TODO: make this into a concrete type, and add it to is_duplicate_request() (#2908)
-    Commit(#[source] BoxError),
+    Commit(#[from] zs::CommitBlockError),
 
     #[error("unable to validate block proposal: failed semantic verification (proof of work is not checked for proposals): {0}")]
     // TODO: make this into a concrete type (see #5732)
@@ -88,6 +88,11 @@ pub enum VerifyBlockError {
 
     #[error("invalid block subsidy: {0}")]
     Subsidy(#[from] SubsidyError),
+
+    /// Errors originating from the state service, which may arise from general failures in interacting with the state.
+    /// This is for errors that are not specifically related to block depth or commit failures.
+    #[error("state service error for block {hash}: {source}")]
+    StateService { source: BoxError, hash: block::Hash },
 }
 
 impl VerifyBlockError {
@@ -96,6 +101,7 @@ impl VerifyBlockError {
     pub fn is_duplicate_request(&self) -> bool {
         match self {
             VerifyBlockError::Block { source, .. } => source.is_duplicate_request(),
+            VerifyBlockError::Commit(commit_err) => commit_err.is_duplicate_request(),
             _ => false,
         }
     }
@@ -227,6 +233,9 @@ where
                 .map_err(VerifyBlockError::Time)?;
             let coinbase_tx = check::coinbase_is_first(&block)?;
 
+            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+            let tachyon_checks = check::verify_tachyon_aggregates(&block)?;
+
             let expected_block_subsidy =
                 zebra_chain::parameters::subsidy::block_subsidy(height, &network)?;
 
@@ -296,6 +305,17 @@ where
                 }
             }
 
+            // Await tachyon batch verification futures.
+            #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+            {
+                use futures::stream::{FuturesUnordered, StreamExt as _};
+                let mut tachyon_async: FuturesUnordered<_> =
+                    tachyon_checks.into_iter().collect();
+                while let Some(result) = tachyon_async.next().await {
+                    result.map_err(|e| BlockError::Other(e.to_string()))?;
+                }
+            }
+
             // Check the summed block totals
 
             if sigops > MAX_BLOCK_SIGOPS {
@@ -353,15 +373,23 @@ where
             match state_service
                 .ready()
                 .await
-                .map_err(VerifyBlockError::Commit)?
+                .map_err(|source| VerifyBlockError::StateService { source, hash })?
                 .call(zs::Request::CommitSemanticallyVerifiedBlock(prepared_block))
                 .await
-                .map_err(VerifyBlockError::Commit)?
             {
-                zs::Response::Committed(committed_hash) => {
+                Ok(zs::Response::Committed(committed_hash)) => {
                     assert_eq!(committed_hash, hash, "state must commit correct hash");
                     Ok(hash)
                 }
+
+                Err(source) => {
+                    if let Some(commit_err) = source.downcast_ref::<zs::CommitBlockError>() {
+                        return Err(VerifyBlockError::Commit(commit_err.clone()));
+                    }
+
+                    Err(VerifyBlockError::StateService { source, hash })
+                }
+
                 _ => unreachable!("wrong response for CommitSemanticallyVerifiedBlock"),
             }
         }

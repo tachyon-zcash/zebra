@@ -948,6 +948,18 @@ impl ZcashDeserialize for Transaction {
                 let network_upgrade =
                     NetworkUpgrade::try_from(limited_reader.read_u32::<LittleEndian>()?)?;
 
+                // # Consensus
+                //
+                // > [NU5 onward] The transaction version number MUST be 4 or 5.
+                //
+                // V5 transactions are only valid from NU5 onward, so reject
+                // transactions with pre-NU5 consensus branch IDs.
+                if network_upgrade < NetworkUpgrade::Nu5 {
+                    return Err(SerializationError::Parse(
+                        "v5 transaction must have NU5 or later consensus branch ID",
+                    ));
+                }
+
                 // Denoted as `lock_time` in the spec.
                 let lock_time = LockTime::zcash_deserialize(&mut limited_reader)?;
 
@@ -971,7 +983,7 @@ impl ZcashDeserialize for Transaction {
                 // `proofsOrchard`, `vSpendAuthSigsOrchard`, and `bindingSigOrchard`.
                 let orchard_shielded_data = (&mut limited_reader).zcash_deserialize_into()?;
 
-                Ok(Transaction::V5 {
+                let tx = Transaction::V5 {
                     network_upgrade,
                     lock_time,
                     expiry_height,
@@ -979,7 +991,11 @@ impl ZcashDeserialize for Transaction {
                     outputs,
                     sapling_shielded_data,
                     orchard_shielded_data,
-                })
+                };
+
+                tx.to_librustzcash(network_upgrade)?;
+
+                Ok(tx)
             }
             #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
             (6, true) => {
@@ -992,7 +1008,13 @@ impl ZcashDeserialize for Transaction {
                 // Convert it to a NetworkUpgrade
                 let network_upgrade =
                     NetworkUpgrade::try_from(limited_reader.read_u32::<LittleEndian>()?)?;
-
+                // V6 transactions are only valid from NU5 onward, so reject
+                // transactions with pre-NU5 consensus branch IDs.
+                if network_upgrade < NetworkUpgrade::Nu5 {
+                    return Err(SerializationError::Parse(
+                        "v6 transaction must have NU5 or later consensus branch ID",
+                    ));
+                }
                 // Denoted as `lock_time` in the spec.
                 let lock_time = LockTime::zcash_deserialize(&mut limited_reader)?;
 
@@ -1421,17 +1443,24 @@ impl ZcashDeserialize for zcash_tachyon::Anchor {
     }
 }
 
+/// Serialized size of a Tachyon proof in bytes.
+/// Matches `mock_ragu::proof::PROOF_SIZE_COMPRESSED`.
+const TACHYON_PROOF_SIZE: usize = 23_000;
+
 impl ZcashSerialize for zcash_tachyon::Proof {
-    fn zcash_serialize<W: io::Write>(&self, _writer: W) -> Result<(), io::Error> {
-        // Proof is currently a stub, no serialization needed yet
-        Ok(())
+    fn zcash_serialize<W: io::Write>(&self, mut writer: W) -> Result<(), io::Error> {
+        let bytes = self.serialize();
+        writer.write_all(bytes.as_ref())
     }
 }
 
 impl ZcashDeserialize for zcash_tachyon::Proof {
-    fn zcash_deserialize<R: io::Read>(_reader: R) -> Result<Self, SerializationError> {
-        // Proof is currently a stub, no deserialization needed yet  
-        Ok(zcash_tachyon::Proof)
+    fn zcash_deserialize<R: io::Read>(mut reader: R) -> Result<Self, SerializationError> {
+        let mut bytes = vec![0u8; TACHYON_PROOF_SIZE];
+        reader.read_exact(&mut bytes)?;
+        let arr: [u8; TACHYON_PROOF_SIZE] = bytes.try_into().expect("vec is TACHYON_PROOF_SIZE");
+        zcash_tachyon::Proof::try_from(&arr)
+            .map_err(|_| SerializationError::Parse("invalid tachyon proof"))
     }
 }
 

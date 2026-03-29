@@ -347,7 +347,7 @@ impl Response {
     pub fn sigops(&self) -> u32 {
         match self {
             Response::Block { sigops, .. } => *sigops,
-            Response::Mempool { transaction, .. } => transaction.sigops,
+            Response::Mempool { transaction, .. } => transaction.legacy_sigop_count,
         }
     }
 
@@ -407,7 +407,7 @@ where
                 return Ok(Response::Block {
                     tx_id,
                     miner_fee: Some(verified_tx.miner_fee),
-                    sigops: verified_tx.sigops
+                    sigops: verified_tx.legacy_sigop_count
                 });
             }
 
@@ -586,10 +586,17 @@ where
                     sigops,
                 },
                 Request::Mempool { transaction: tx, .. } => {
+                    // TODO: `spent_outputs` may not align with `tx.inputs()` when a transaction
+                    // spends both chain and mempool UTXOs (mempool outputs are appended last by
+                    // `spent_utxos()`), causing policy checks to pair the wrong input with
+                    // the wrong spent output.
+                    // https://github.com/ZcashFoundation/zebra/issues/10346
+                    let spent_outputs = cached_ffi_transaction.all_previous_outputs().clone();
                     let transaction = VerifiedUnminedTx::new(
                         tx,
                         miner_fee.expect("fee should have been checked earlier"),
                         sigops,
+                        spent_outputs.into(),
                     )?;
 
                     if let Some(mut mempool) = mempool {
@@ -674,18 +681,24 @@ where
 
         let mempool = mempool?;
         let known_outpoint_hashes = req.known_outpoint_hashes();
-        let tx_id = req.tx_mined_id();
+        let tx_id = req.tx_id();
 
         let mempool::Response::TransactionWithDeps {
             transaction: verified_tx,
             dependencies,
         } = mempool
-            .oneshot(mempool::Request::TransactionWithDepsByMinedId(tx_id))
+            .oneshot(mempool::Request::TransactionWithDepsByMinedId(
+                tx_id.mined_id(),
+            ))
             .await
             .ok()?
         else {
             panic!("unexpected response to TransactionWithDepsByMinedId request");
         };
+
+        if verified_tx.transaction.id != tx_id {
+            return None;
+        }
 
         // Note: This does not verify that the spends are in order, the spend order
         //       should be verified during contextual validation in zebra-state.
@@ -749,10 +762,13 @@ where
 
         let inputs = tx.inputs();
         let mut spent_utxos = HashMap::new();
-        let mut spent_outputs = Vec::new();
-        let mut spent_mempool_outpoints = Vec::new();
+        // Pre-allocate with None so we can fill each slot by input index, preserving input order
+        // even when chain and mempool UTXOs are fetched in separate passes.
+        let mut spent_outputs: Vec<Option<transparent::Output>> = vec![None; inputs.len()];
+        // Stores (input_idx, outpoint) for UTXOs not found in the best chain (fetched from mempool later).
+        let mut spent_mempool_outpoints: Vec<(usize, transparent::OutPoint)> = Vec::new();
 
-        for input in inputs {
+        for (input_idx, input) in inputs.iter().enumerate() {
             if let transparent::Input::PrevOut { outpoint, .. } = input {
                 tracing::trace!("awaiting outpoint lookup");
                 let utxo = if let Some(output) = known_utxos.get(outpoint) {
@@ -771,7 +787,7 @@ where
                     };
 
                     let Some(utxo) = utxo else {
-                        spent_mempool_outpoints.push(*outpoint);
+                        spent_mempool_outpoints.push((input_idx, *outpoint));
                         continue;
                     };
 
@@ -787,7 +803,7 @@ where
                     }
                 };
                 tracing::trace!(?utxo, "got UTXO");
-                spent_outputs.push(utxo.output.clone());
+                spent_outputs[input_idx] = Some(utxo.output.clone());
                 spent_utxos.insert(*outpoint, utxo);
             } else {
                 continue;
@@ -795,7 +811,7 @@ where
         }
 
         if let Some(mempool) = mempool {
-            for &spent_mempool_outpoint in &spent_mempool_outpoints {
+            for &(input_idx, spent_mempool_outpoint) in &spent_mempool_outpoints {
                 let query = mempool
                     .clone()
                     .oneshot(mempool::Request::AwaitOutput(spent_mempool_outpoint));
@@ -811,7 +827,7 @@ where
                     }
                 };
 
-                spent_outputs.push(output.clone());
+                spent_outputs[input_idx] = Some(output.clone());
                 spent_utxos.insert(
                     spent_mempool_outpoint,
                     // Assume the Utxo height will be next height after the best chain tip height
@@ -826,6 +842,13 @@ where
         } else if !spent_mempool_outpoints.is_empty() {
             return Err(TransactionError::TransparentInputNotFound);
         }
+
+        // Convert back to return types; slots are in input order.
+        let spent_outputs: Vec<transparent::Output> = spent_outputs.into_iter().flatten().collect();
+        let spent_mempool_outpoints: Vec<transparent::OutPoint> = spent_mempool_outpoints
+            .into_iter()
+            .map(|(_, op)| op)
+            .collect();
 
         Ok((spent_utxos, spent_outputs, spent_mempool_outpoints))
     }
@@ -1030,7 +1053,10 @@ where
         }
     }
 
-    /// Passthrough to verify_v5_transaction, but for V6 transactions.
+    /// Verify a V6 transaction.
+    ///
+    /// This verifies all V5 checks (transparent, sapling, orchard) plus
+    /// tachyon bundle signature verification (SpendAuth + binding).
     #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
     fn verify_v6_transaction(
         request: &Request,
@@ -1038,7 +1064,18 @@ where
         script_verifier: script::Verifier,
         cached_ffi_transaction: Arc<CachedFfiTransaction>,
     ) -> Result<AsyncChecks, TransactionError> {
-        Self::verify_v5_transaction(request, network, script_verifier, cached_ffi_transaction)
+        let transaction = request.transaction();
+        let sighash = cached_ffi_transaction
+            .sighasher()
+            .sighash(HashType::ALL, None);
+
+        Ok(Self::verify_v5_transaction(
+            request,
+            network,
+            script_verifier,
+            cached_ffi_transaction,
+        )?
+        .and(Self::verify_tachyon_bundle(&transaction, &sighash)))
     }
 
     /// Verifies if a transaction's transparent inputs are valid using the provided
@@ -1231,6 +1268,69 @@ where
                     .oneshot(primitives::halo2::Item::new(bundle, *sighash)),
             );
         }
+
+        async_checks
+    }
+
+    /// Verifies a transaction's Tachyon shielded data signatures.
+    ///
+    /// Queues per-action SpendAuth signatures and the bundle binding signature
+    /// for batch verification via the RedPallas batch verifier.
+    ///
+    /// Stamp proof verification is handled separately at the block level
+    /// in [`super::check::verify_tachyon_aggregates`].
+    #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+    fn verify_tachyon_bundle(transaction: &Transaction, sighash: &SigHash) -> AsyncChecks {
+        use pasta_curves::group::GroupEncoding as _;
+
+        let mut async_checks = AsyncChecks::new();
+
+        let bundle = match transaction {
+            Transaction::V6 {
+                tachyon_shielded_data: Some(bundle),
+                ..
+            } => bundle,
+            _ => return async_checks,
+        };
+
+        // Verify per-action SpendAuth signatures.
+        //
+        // Each action's `rk` (randomized verification key) must validate the
+        // action's `sig` over the transaction sighash.
+        for action in &bundle.actions {
+            let rk_bytes: [u8; 32] = action.rk.into();
+            let sig_bytes: [u8; 64] = action.sig.into();
+            async_checks.push(
+                primitives::redpallas::VERIFIER.clone().oneshot(
+                    primitives::redpallas::Item::from_spendauth(
+                        rk_bytes.into(),
+                        sig_bytes.into(),
+                        sighash,
+                    ),
+                ),
+            );
+        }
+
+        // Verify the binding signature.
+        //
+        // The binding verification key is derived from value commitments:
+        //   bvk = (Σ cv_i) - ValueCommit_0(value_balance)
+        // and must validate the bundle's binding_sig over the sighash.
+        let bvk_point = zcash_tachyon::keys::public::derive_bvk(
+            bundle.actions.iter().map(|a| a.cv),
+            bundle.value_balance,
+        );
+        let bvk_bytes: [u8; 32] = bvk_point.to_bytes();
+        let binding_sig_bytes: [u8; 64] = bundle.binding_sig.into();
+        async_checks.push(
+            primitives::redpallas::VERIFIER.clone().oneshot(
+                primitives::redpallas::Item::from_binding(
+                    bvk_bytes.into(),
+                    binding_sig_bytes.into(),
+                    sighash,
+                ),
+            ),
+        );
 
         async_checks
     }
