@@ -507,7 +507,26 @@ fn log_network_upgrade_activation(upgrade: NetworkUpgrade, height: Height) {
             c6 = r" _||__||__||_ ",
             width = content_width,
         ),
-        // Generic banner for NU5, NU6, NU6.1, NU7, and future upgrades
+        NetworkUpgrade::Nu7 => format!(
+            r#"
+ +{border}+
+ |{blank}|
+ |{t1:^width$}|
+ |{t2:^width$}|
+ |{t3:^width$}|
+ |{t4:^width$}|
+ |{t5:^width$}|
+ |{blank}|
+ +{border}+
+"#,
+            border = border,
+            blank = " ".repeat(content_width),
+            t1 = "💫 Tachyon 💫",
+            t2 = name,
+            t3 = height_str,
+            width = content_width,
+        ),
+        // Generic banner for NU5, NU6, NU6.1, and future upgrades
         _ => format!(
             r#"
  +{border}+
