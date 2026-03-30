@@ -1681,6 +1681,16 @@ impl Chain {
         {
             use zebra_chain::parameters::constants::TACHYON_EPOCH_LENGTH;
 
+            // check tachygram uniqueness within the current epoch
+            for tachygram in &block_tachygrams {
+                if self.current_epoch_tachygrams.contains(tachygram) {
+                    return Err(ValidateContextError::DuplicateTachygram {
+                        height: Some(height),
+                        tx_index_in_block: None,
+                    });
+                }
+            }
+
             self.tachygrams_by_height
                 .insert(height, block_tachygrams.clone());
             self.current_epoch_tachygrams
@@ -1903,6 +1913,30 @@ impl UpdateWith<ContextuallyVerifiedBlock> for Chain {
 
 #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
 impl Chain {
+    /// Returns the accumulator for the previous epoch relative to `height`.
+    ///
+    /// The previous epoch boundary is the largest multiple of `TACHYON_EPOCH_LENGTH`
+    /// that is strictly less than the current epoch's start. For the first epoch
+    /// (before any boundary has been reached), returns the default accumulator.
+    pub(crate) fn previous_epoch_accumulator(
+        &self,
+        height: Height,
+    ) -> TachyonAccumulator {
+        use zebra_chain::parameters::constants::TACHYON_EPOCH_LENGTH;
+
+        let current_epoch = height.0 / TACHYON_EPOCH_LENGTH;
+        if current_epoch == 0 {
+            // first epoch: use default accumulator
+            return TachyonAccumulator::default();
+        }
+
+        let prev_epoch_boundary = Height((current_epoch - 1) * TACHYON_EPOCH_LENGTH);
+        self.tachyon_accumulators_by_height
+            .get(&prev_epoch_boundary)
+            .cloned()
+            .unwrap_or_default()
+    }
+
     /// Remove tachyon tracking data when reverting a block at `height`.
     fn remove_tachyon_data(&mut self, position: RevertPosition, height: Height) {
         use zebra_chain::parameters::constants::TACHYON_EPOCH_LENGTH;

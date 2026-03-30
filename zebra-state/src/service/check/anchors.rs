@@ -495,3 +495,50 @@ pub(crate) fn tx_anchors_refer_to_final_treestates(
 
     Ok(())
 }
+
+/// Checks that all tachyon anchors in the block refer to the previous epoch's accumulator.
+///
+/// A tachyon bundle's stamp contains an anchor that must equal the accumulator value
+/// from the end of the previous epoch. For the first epoch (before any epoch boundary),
+/// the anchor must match the default accumulator value.
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+#[tracing::instrument(skip_all)]
+pub(crate) fn block_tachyon_anchors_refer_to_accumulators(
+    parent_chain: &Arc<Chain>,
+    semantically_verified: &SemanticallyVerifiedBlock,
+) -> Result<(), ValidateContextError> {
+    use zebra_chain::transaction::Transaction::V6;
+
+    let expected_accumulator =
+        parent_chain.previous_epoch_accumulator(semantically_verified.height);
+
+    for (tx_index_in_block, transaction) in
+        semantically_verified.block.transactions.iter().enumerate()
+    {
+        if let V6 {
+            tachyon_shielded_data: Some(bundle),
+            ..
+        } = transaction.as_ref()
+        {
+            if let Some(stamp) = &bundle.stamp {
+                let mut anchor_bytes = [0u8; 32];
+                zebra_chain::serialization::ZcashSerialize::zcash_serialize(
+                    &stamp.anchor,
+                    &mut anchor_bytes[..],
+                )
+                .expect("anchor serializes to exactly 32 bytes");
+
+                if anchor_bytes != expected_accumulator.0 {
+                    return Err(ValidateContextError::UnknownTachyonAnchor {
+                        height: Some(semantically_verified.height),
+                        tx_index_in_block: Some(tx_index_in_block),
+                        transaction_hash: semantically_verified.transaction_hashes
+                            [tx_index_in_block],
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(())
+}

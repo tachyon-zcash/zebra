@@ -383,6 +383,26 @@ pub enum ValidateContextError {
         tx_index_in_block: Option<usize>,
         transaction_hash: transaction::Hash,
     },
+
+    #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+    #[error("tachyon duplicate tachygram in current epoch, {height:?}, index in block: {tx_index_in_block:?}")]
+    #[non_exhaustive]
+    DuplicateTachygram {
+        height: Option<block::Height>,
+        tx_index_in_block: Option<usize>,
+    },
+
+    #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+    #[error(
+        "unknown tachyon anchor: does not match previous epoch accumulator,\n\
+         {height:?}, index in block: {tx_index_in_block:?}, {transaction_hash:?}"
+    )]
+    #[non_exhaustive]
+    UnknownTachyonAnchor {
+        height: Option<block::Height>,
+        tx_index_in_block: Option<usize>,
+        transaction_hash: transaction::Hash,
+    },
 }
 
 impl From<sprout::tree::NoteCommitmentTreeError> for ValidateContextError {

@@ -581,6 +581,10 @@ impl NonFinalizedState {
             &prepared,
         )?;
 
+        // Check tachyon anchors against previous epoch accumulator
+        #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+        check::anchors::block_tachyon_anchors_refer_to_accumulators(&new_chain, &prepared)?;
+
         // Reads from disk
         let sprout_final_treestates = check::anchors::block_fetch_sprout_final_treestates(
             finalized_state,
