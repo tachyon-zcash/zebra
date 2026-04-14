@@ -68,6 +68,64 @@ pub fn coinbase_is_first(block: &Block) -> Result<Arc<transaction::Transaction>,
     Ok(first.clone())
 }
 
+/// Verifies tachyon proof aggregation for a block.
+///
+/// Tachyon transactions in a block use proof aggregation: a stamped bundle's
+/// proof covers its own actions plus those of any immediately following
+/// unstamped (stripped) bundles. This function enforces that structure and
+/// verifies each aggregate proof.
+///
+/// Algorithm:
+/// 1. Iterate through block transactions.
+/// 2. For stamped tachyon txs: collect actions from self + following unstamped txs, verify proof.
+/// 3. For unstamped tachyon txs not preceded by a stamped tx: error.
+/// 4. Skip non-tachyon transactions.
+#[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
+pub fn verify_tachyon_aggregates(block: &Block) -> Result<(), BlockError> {
+    let mut groups: Vec<(&zcash_tachyon::Stamp, Vec<zcash_tachyon::Action>)> = Vec::new();
+    let mut current: Option<(&zcash_tachyon::Stamp, Vec<zcash_tachyon::Action>)> = None;
+
+    for tx in &block.transactions {
+        let bundle = match tx.as_ref() {
+            Transaction::V6 {
+                tachyon_shielded_data: Some(bundle),
+                ..
+            } => bundle,
+            _ => continue,
+        };
+
+        match &bundle.stamp {
+            Some(stamp) => {
+                if let Some(prev) = current.take() {
+                    groups.push(prev);
+                }
+                current = Some((stamp, bundle.actions.clone()));
+            }
+            None => match current.as_mut() {
+                Some((_, actions)) => actions.extend(bundle.actions.iter().cloned()),
+                None => {
+                    return Err(BlockError::Other(
+                        "unstamped tachyon bundle not preceded by a stamped bundle".to_string(),
+                    ));
+                }
+            },
+        }
+    }
+
+    if let Some(last) = current.take() {
+        groups.push(last);
+    }
+
+    for (stamp, actions) in groups {
+        stamp
+            .proof
+            .verify(actions, stamp.tachygrams.clone(), stamp.anchor)
+            .map_err(|_| BlockError::Other("tachyon proof verification failed".to_string()))?;
+    }
+
+    Ok(())
+}
+
 /// Returns `Ok(ExpandedDifficulty)` if the`difficulty_threshold` of `header` is at least as difficult as
 /// the target difficulty limit for `network` (PoWLimit)
 ///
