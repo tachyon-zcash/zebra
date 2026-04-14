@@ -1213,7 +1213,7 @@ const TACHYON_PROOF_SIZE: usize = 23_000;
 /// `stampTachyon` compactsize (proof size if stamped, stamp index if
 /// stripped), then a stamp trailer if stamped.
 #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
-fn write_tachyon_bundle<W: io::Write>(
+pub(super) fn write_tachyon_bundle<W: io::Write>(
     bundle: &TachyonBundle,
     mut writer: W,
 ) -> Result<(), io::Error> {

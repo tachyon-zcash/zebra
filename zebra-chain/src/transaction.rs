@@ -172,12 +172,28 @@ pub enum Transaction {
         /// The orchard data for this transaction, if any.
         orchard_shielded_data: Option<orchard::ShieldedData>,
         /// The tachyon data for this transaction, if any.
-        #[cfg_attr(
-            any(test, feature = "proptest-impl", feature = "elasticsearch"),
-            serde(skip)
-        )]
         tachyon_shielded_data: Option<TachyonBundle>,
     },
+}
+
+/// Serde shim: serializes a `TachyonBundle` using its consensus wire format
+/// (via `zcash_tachyon`). Hex-encoded for JSON/text formats, raw bytes for
+/// binary formats.
+#[cfg(all(
+    zcash_unstable = "nu7",
+    feature = "tx_v6",
+    any(test, feature = "proptest-impl", feature = "elasticsearch"),
+))]
+impl serde::Serialize for TachyonBundle {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut bytes = Vec::new();
+        serialize::write_tachyon_bundle(self, &mut bytes).map_err(serde::ser::Error::custom)?;
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&hex::encode(&bytes))
+        } else {
+            serializer.serialize_bytes(&bytes)
+        }
+    }
 }
 
 /// Wire-level discriminator for the Tachyon bundle on a V6 transaction.
