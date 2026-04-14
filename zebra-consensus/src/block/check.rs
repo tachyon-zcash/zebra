@@ -82,59 +82,45 @@ pub fn coinbase_is_first(block: &Block) -> Result<Arc<transaction::Transaction>,
 /// 4. Skip non-tachyon transactions.
 #[cfg(all(zcash_unstable = "nu7", feature = "tx_v6"))]
 pub fn verify_tachyon_aggregates(block: &Block) -> Result<(), BlockError> {
-    let mut i = 0;
-    let txs = &block.transactions;
+    let mut groups: Vec<(&zcash_tachyon::Stamp, Vec<zcash_tachyon::Action>)> = Vec::new();
+    let mut current: Option<(&zcash_tachyon::Stamp, Vec<zcash_tachyon::Action>)> = None;
 
-    while i < txs.len() {
-        // Extract tachyon bundle from this transaction, if any.
-        let bundle = match txs[i].as_ref() {
+    for tx in &block.transactions {
+        let bundle = match tx.as_ref() {
             Transaction::V6 {
                 tachyon_shielded_data: Some(bundle),
                 ..
             } => bundle,
-            _ => {
-                i += 1;
-                continue;
-            }
+            _ => continue,
         };
 
         match &bundle.stamp {
             Some(stamp) => {
-                // Stamped bundle: collect actions from this tx and following unstamped txs.
-                let mut all_actions: Vec<zcash_tachyon::Action> = bundle.actions.clone();
-
-                // Advance past this stamped tx and collect trailing unstamped tachyon txs.
-                i += 1;
-                while i < txs.len() {
-                    match txs[i].as_ref() {
-                        Transaction::V6 {
-                            tachyon_shielded_data: Some(adj_bundle),
-                            ..
-                        } if adj_bundle.stamp.is_none() => {
-                            all_actions.extend(adj_bundle.actions.iter().cloned());
-                            i += 1;
-                        }
-                        _ => break,
-                    }
+                if let Some(prev) = current.take() {
+                    groups.push(prev);
                 }
-
-                // Verify the stamp proof against the accumulated actions.
-                stamp
-                    .proof
-                    .verify(all_actions, stamp.tachygrams.clone(), stamp.anchor)
-                    .map_err(|_| {
-                        BlockError::Other(
-                            "tachyon proof verification failed".to_string(),
-                        )
-                    })?;
+                current = Some((stamp, bundle.actions.clone()));
             }
-            None => {
-                // Unstamped tachyon tx not covered by a preceding stamped tx.
-                return Err(BlockError::Other(
-                    "unstamped tachyon bundle not preceded by a stamped bundle".to_string(),
-                ));
-            }
+            None => match current.as_mut() {
+                Some((_, actions)) => actions.extend(bundle.actions.iter().cloned()),
+                None => {
+                    return Err(BlockError::Other(
+                        "unstamped tachyon bundle not preceded by a stamped bundle".to_string(),
+                    ));
+                }
+            },
         }
+    }
+
+    if let Some(last) = current.take() {
+        groups.push(last);
+    }
+
+    for (stamp, actions) in groups {
+        stamp
+            .proof
+            .verify(actions, stamp.tachygrams.clone(), stamp.anchor)
+            .map_err(|_| BlockError::Other("tachyon proof verification failed".to_string()))?;
     }
 
     Ok(())
