@@ -7372,6 +7372,7 @@ dependencies = [
  "tracing-subscriber",
  "zcash_proofs",
  "zcash_protocol",
+ "zcash_tachyon",
  "zebra-chain",
  "zebra-node-services",
  "zebra-script",
