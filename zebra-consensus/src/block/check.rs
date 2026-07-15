@@ -113,11 +113,11 @@ pub fn verify_tachyon_aggregates(block: &Block) -> Result<(), BlockError> {
 
     for tx in &block.transactions {
         if let Transaction::V6 {
-            tachyon_shielded_data: Some(TachyonShieldedData(TachyonBundle::Stripped(bundle))),
+            tachyon_shielded_data: Some(TachyonShieldedData(TachyonBundle::Adjunct(bundle))),
             ..
         } = tx.as_ref()
         {
-            let (_, actions) = groups.get_mut(&bundle.stamp.wtxid).ok_or_else(|| {
+            let (_, actions) = groups.get_mut(&<[u8; 64]>::from(bundle.stamp)).ok_or_else(|| {
                 BlockError::Other(
                     "stripped tachyon bundle references a wtxid with no stamped bundle in the block"
                         .to_string(),
@@ -129,7 +129,7 @@ pub fn verify_tachyon_aggregates(block: &Block) -> Result<(), BlockError> {
 
     let mut rng = rand::rngs::OsRng;
     for (stamp, actions) in groups.values() {
-        stamp.verify(actions, &mut rng).map_err(|_| {
+        stamp.verify(&mut rng, actions).map_err(|_| {
             BlockError::Other("tachyon aggregate proof verification failed".to_string())
         })?;
     }
@@ -329,7 +329,13 @@ pub fn subsidy_is_valid(
         if Some(height) == NetworkUpgrade::Nu6_1.activation_height(net) {
             let lockbox_disbursements = net.lockbox_disbursements(height);
 
-            if lockbox_disbursements.is_empty() {
+            // The Mainnet and default Testnet disbursement lists are hardcoded and must be
+            // non-empty. Custom testnets and Regtest may configure no disbursements, in which
+            // case the NU6.1 activation block is not required to contain any disbursement
+            // outputs.
+            let must_have_disbursements =
+                matches!(net, Network::Mainnet) || net.is_default_testnet();
+            if lockbox_disbursements.is_empty() && must_have_disbursements {
                 Err(BlockError::Other(
                     "missing lockbox disbursements for NU6.1 activation block".to_string(),
                 ))?;
