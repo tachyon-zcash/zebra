@@ -1053,6 +1053,25 @@ mod v6_tests {
         zcash_tachyon::keys::public::ActionVerificationKey::try_from(<[u8; 32]>::from(pk)).unwrap()
     }
 
+    /// Helper: derive Fp from a 64-byte seed.
+    fn fp_from_seed(seed: [u8; 64]) -> pasta_curves::Fp {
+        pasta_curves::Fp::from_uniform_bytes(&seed)
+    }
+
+    /// Helper: build a default Anchor (height 0, identity pool commit) by
+    /// reading a 64-byte zero buffer through tachyon's wire format. Anchor's
+    /// `BlockHeight` field is `pub(crate)` upstream, so this is the simplest
+    /// way to construct one from outside the tachyon crate.
+    fn default_anchor() -> zcash_tachyon::Anchor {
+        zcash_tachyon::Anchor::read(&[0u8; 64][..]).unwrap()
+    }
+
+    /// Helper: build an Adjunct with the given wtxid (covering-aggregate
+    /// reference for stripped bundles).
+    fn adjunct_with_wtxid(wtxid: [u8; 64]) -> zcash_tachyon::stamp::Adjunct {
+        zcash_tachyon::stamp::Adjunct { wtxid }
+    }
+
     lazy_static! {
         /// An empty V6 transaction with no bundles at all.
         pub static ref EMPTY_V6_TX: Transaction = Transaction::V6 {
@@ -1067,11 +1086,7 @@ mod v6_tests {
             tachyon_shielded_data: None,
         };
 
-        /// V6 transaction with a stripped tachyon bundle referencing
-        /// stamp index 0. Stamped-bundle test vectors are omitted because
-        /// constructing a `zcash_tachyon::Proof` requires the upstream
-        /// proving path; the aggregate-verification test in
-        /// `zebra-consensus` exercises stamped bundles via produced proofs.
+        /// V6 transaction with a stripped tachyon bundle (post-aggregation, no stamp).
         pub static ref V6_TX_TACHYON_STRIPPED: Transaction = {
             let rk = rk_from_seed([0x42u8; 64]);
             let action = zcash_tachyon::Action {
@@ -1079,12 +1094,12 @@ mod v6_tests {
                 rk,
                 sig: zcash_tachyon::action::Signature::from([0x01u8; 64]),
             };
-            let stripped = zcash_tachyon::Stripped {
+            let bundle = zcash_tachyon::TachyonBundle::Stripped(zcash_tachyon::Stripped {
                 actions: vec![action],
                 value_balance: 0i64,
                 binding_sig: zcash_tachyon::bundle::Signature::from([0x02u8; 64]),
-                stamp: zcash_tachyon::stamp::Adjunct::new(0),
-            };
+                stamp: adjunct_with_wtxid([0xEEu8; 64]),
+            });
             Transaction::V6 {
                 network_upgrade: NetworkUpgrade::Nu7,
                 lock_time: LockTime::min_lock_time_timestamp(),
@@ -1094,9 +1109,79 @@ mod v6_tests {
                 outputs: Vec::new(),
                 sapling_shielded_data: None,
                 orchard_shielded_data: None,
-                tachyon_shielded_data: Some(
-                    crate::transaction::TachyonBundle::Stripped(stripped),
-                ),
+                tachyon_shielded_data: Some(crate::transaction::TachyonShieldedData(bundle)),
+            }
+        };
+
+        /// V6 transaction with a stamped tachyon bundle (autonome with proof + tachygrams).
+        pub static ref V6_TX_TACHYON_STAMPED: Transaction = {
+            let rk = rk_from_seed([0x42u8; 64]);
+            let action = zcash_tachyon::Action {
+                cv: zcash_tachyon::value::Commitment::from(pasta_curves::EpAffine::generator()),
+                rk,
+                sig: zcash_tachyon::action::Signature::from([0x01u8; 64]),
+            };
+            let tachygram = zcash_tachyon::Tachygram::from(&fp_from_seed([0xAAu8; 64]));
+            let bundle = zcash_tachyon::TachyonBundle::Stamped(zcash_tachyon::Stamped {
+                actions: vec![action],
+                value_balance: 100i64,
+                binding_sig: zcash_tachyon::bundle::Signature::from([0x02u8; 64]),
+                stamp: zcash_tachyon::Stamp {
+                    tachygrams: vec![tachygram],
+                    anchor: default_anchor(),
+                    proof: mock_ragu::Proof::trivial(),
+                },
+            });
+            Transaction::V6 {
+                network_upgrade: NetworkUpgrade::Nu7,
+                lock_time: LockTime::min_lock_time_timestamp(),
+                expiry_height: block::Height(0),
+                zip233_amount: Amount::try_from(0).unwrap(),
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                sapling_shielded_data: None,
+                orchard_shielded_data: None,
+                tachyon_shielded_data: Some(crate::transaction::TachyonShieldedData(bundle)),
+            }
+        };
+
+        /// V6 transaction with a stamped bundle, multiple actions and multiple tachygrams.
+        pub static ref V6_TX_TACHYON_MULTI_ACTION: Transaction = {
+            let rk1 = rk_from_seed([0x42u8; 64]);
+            let rk2 = rk_from_seed([0x43u8; 64]);
+            let action1 = zcash_tachyon::Action {
+                cv: zcash_tachyon::value::Commitment::from(pasta_curves::EpAffine::generator()),
+                rk: rk1,
+                sig: zcash_tachyon::action::Signature::from([0x01u8; 64]),
+            };
+            let action2 = zcash_tachyon::Action {
+                cv: zcash_tachyon::value::Commitment::from(pasta_curves::EpAffine::generator()),
+                rk: rk2,
+                sig: zcash_tachyon::action::Signature::from([0x03u8; 64]),
+            };
+            let tg1 = zcash_tachyon::Tachygram::from(&fp_from_seed([0xAAu8; 64]));
+            let tg2 = zcash_tachyon::Tachygram::from(&fp_from_seed([0xCCu8; 64]));
+            let tg3 = zcash_tachyon::Tachygram::from(&fp_from_seed([0xDDu8; 64]));
+            let bundle = zcash_tachyon::TachyonBundle::Stamped(zcash_tachyon::Stamped {
+                actions: vec![action1, action2],
+                value_balance: 300i64,
+                binding_sig: zcash_tachyon::bundle::Signature::from([0x02u8; 64]),
+                stamp: zcash_tachyon::Stamp {
+                    tachygrams: vec![tg1, tg2, tg3],
+                    anchor: default_anchor(),
+                    proof: mock_ragu::Proof::trivial(),
+                },
+            });
+            Transaction::V6 {
+                network_upgrade: NetworkUpgrade::Nu7,
+                lock_time: LockTime::min_lock_time_timestamp(),
+                expiry_height: block::Height(0),
+                zip233_amount: Amount::try_from(500).unwrap(),
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                sapling_shielded_data: None,
+                orchard_shielded_data: None,
+                tachyon_shielded_data: Some(crate::transaction::TachyonShieldedData(bundle)),
             }
         };
     }
@@ -1130,12 +1215,12 @@ mod v6_tests {
         let test_cases: &[(&str, &Transaction)] = &[
             ("EMPTY_V6_TX", &EMPTY_V6_TX),
             ("V6_TX_TACHYON_STRIPPED", &V6_TX_TACHYON_STRIPPED),
+            ("V6_TX_TACHYON_STAMPED", &V6_TX_TACHYON_STAMPED),
+            ("V6_TX_TACHYON_MULTI_ACTION", &V6_TX_TACHYON_MULTI_ACTION),
         ];
 
         for (name, tx) in test_cases {
-            let bytes = tx
-                .zcash_serialize_to_vec()
-                .expect("tx should serialize");
+            let bytes = tx.zcash_serialize_to_vec().expect("tx should serialize");
 
             let tx2: Transaction = bytes
                 .clone()
@@ -1147,4 +1232,245 @@ mod v6_tests {
             println!("{name}: {}", hex::encode(&bytes));
         }
     }
+
+    /// Pin the exact wire encoding for the small V6 fixtures. Stamped
+    /// fixtures are not pinned here because their proof field carries
+    /// `PROOF_SIZE_COMPRESSED` (~23KB) of mostly-zero padding — the
+    /// round-trip test below covers the encoding without ~46KB of inline hex.
+    #[test]
+    fn v6_tachyon_test_vectors_exact_encoding() {
+        let _init_guard = zebra_test::init();
+
+        // To regenerate after intentional wire-format changes, run
+        // `generate_v6_tachyon_test_vectors` and paste the printed hex below.
+        let test_cases: &[(&str, &Transaction, &str)] = &[
+            (
+                "EMPTY_V6_TX",
+                &EMPTY_V6_TX,
+                "06000080ffffffffffffffff0065cd1d000000000000000000000000000000000000",
+            ),
+            (
+                "V6_TX_TACHYON_STRIPPED",
+                &V6_TX_TACHYON_STRIPPED,
+                "06000080ffffffffffffffff0065cd1d00000000000000000000000000000000000200000000000000000100000000ed302d991bf94c09fc98462200000000000000000000000000000040ba6454c4a1d42730b53cbf30d05d3f95aa541c98eba0205a75bb7983443b37310101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010102020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            ),
+        ];
+
+        for (name, tx, expected_hex) in test_cases {
+            let bytes = tx.zcash_serialize_to_vec().expect("tx should serialize");
+
+            assert_eq!(
+                hex::encode(&bytes),
+                *expected_hex,
+                "{name} encoding mismatch"
+            );
+        }
+    }
+
+    /// Round-trip every V6 fixture to confirm the new TachyonBundle wire
+    /// format encodes and decodes losslessly. Independent of the hardcoded
+    /// hex check above so it stays meaningful even before the hex is pinned.
+    #[test]
+    fn v6_tachyon_round_trip_fixtures() {
+        let _init_guard = zebra_test::init();
+
+        for (name, tx) in &[
+            ("EMPTY_V6_TX", &*EMPTY_V6_TX),
+            ("V6_TX_TACHYON_STRIPPED", &*V6_TX_TACHYON_STRIPPED),
+            ("V6_TX_TACHYON_STAMPED", &*V6_TX_TACHYON_STAMPED),
+            ("V6_TX_TACHYON_MULTI_ACTION", &*V6_TX_TACHYON_MULTI_ACTION),
+        ] {
+            let bytes = tx.zcash_serialize_to_vec().expect("serialize");
+            let decoded: Transaction = bytes
+                .clone()
+                .zcash_deserialize_into()
+                .unwrap_or_else(|err| panic!("{name} deserialize failed: {err:?}"));
+            assert_eq!(*tx, &decoded, "{name} round-trip mismatch");
+            let bytes2 = decoded.zcash_serialize_to_vec().expect("re-serialize");
+            assert_eq!(bytes, bytes2, "{name} re-serialization differs");
+        }
+    }
+}
+
+/// Regression test for the Orchard `rk` identity-point DoS vulnerability.
+///
+/// A v5 transaction whose Orchard action has `rk = [0u8; 32]` (the Pallas
+/// identity point) **deserializes successfully** — Zebra performs no
+/// identity-point check in [`crate::orchard::Action::zcash_deserialize`].
+///
+/// When the same transaction is subsequently fed to the Orchard Halo2 batch
+/// verifier via [`orchard::bundle::BatchValidator::add_bundle`], the call
+/// chain reaches `orchard::circuit::to_halo2_instance()`, which calls
+/// `.coordinates().unwrap()` on the identity point.  `coordinates()` returns
+/// `None` for the identity, so the `unwrap` **panics**, crashing the node.
+///
+/// ## Root cause
+///
+/// `zebra-chain/src/orchard/action.rs:83` reads `rk` as raw bytes with no
+/// identity-point check: `reader.read_32_bytes()?.into()`.  The upstream
+/// `orchard` crate defers validation to signature verification, but
+/// `to_halo2_instance()` unwraps the coordinate extraction unconditionally.
+///
+/// An analogous identity check already exists for `ephemeral_key`
+/// (`zebra-chain/src/orchard/keys.rs:225-238`), demonstrating the correct
+/// pattern.
+#[test]
+fn orchard_rk_identity_point() {
+    use group::prime::PrimeCurveAffine;
+    use reddsa::Signature;
+
+    use crate::{
+        at_least_one,
+        block::Height,
+        orchard::{
+            keys::EphemeralPublicKey, tree, Action, AuthorizedAction, EncryptedNote, Flags,
+            NoteCommitment, Nullifier, ShieldedData, ValueCommitment, WrappedNoteKey,
+        },
+        primitives::Halo2Proof,
+        serialization::ZcashSerialize,
+    };
+    use halo2::pasta::pallas;
+
+    let _init_guard = zebra_test::init();
+
+    // Construct an Orchard action with rk = [0u8; 32] (identity point).
+    // Other fields use the Pallas generator or the identity as appropriate.
+    let action = Action {
+        // cv can be any valid Pallas point; identity is accepted here.
+        cv: ValueCommitment(pallas::Affine::identity()),
+        nullifier: Nullifier(pallas::Base::zero()),
+        // rk = identity point — this is the vulnerability trigger.
+        rk: [0u8; 32].into(),
+        // cm_x is the x-coordinate of the note commitment.
+        cm_x: NoteCommitment(pallas::Affine::identity()).extract_x(),
+        // ephemeral_key must be non-identity; use the generator.
+        ephemeral_key: EphemeralPublicKey(pallas::Affine::generator()),
+        enc_ciphertext: EncryptedNote([0u8; 580]),
+        out_ciphertext: WrappedNoteKey([0u8; 80]),
+    };
+
+    let shielded_data = ShieldedData {
+        flags: Flags::ENABLE_SPENDS | Flags::ENABLE_OUTPUTS,
+        value_balance: crate::amount::Amount::try_from(0).expect("zero is a valid amount"),
+        shared_anchor: tree::Root::default(),
+        // An empty proof is accepted at deserialization time.
+        proof: Halo2Proof(vec![]),
+        actions: at_least_one![AuthorizedAction {
+            action,
+            spend_auth_sig: Signature::from([0u8; 64]),
+        }],
+        binding_sig: Signature::from([0u8; 64]),
+    };
+
+    let tx = Transaction::V5 {
+        network_upgrade: NetworkUpgrade::Nu5,
+        lock_time: LockTime::unlocked(),
+        expiry_height: Height(0),
+        inputs: vec![],
+        outputs: vec![],
+        sapling_shielded_data: None,
+        orchard_shielded_data: Some(shielded_data),
+    };
+
+    // Step 1: serialize the transaction.
+    let tx_bytes = tx
+        .zcash_serialize_to_vec()
+        .expect("crafted transaction must serialize without error");
+
+    // Step 2: deserialize
+    Transaction::zcash_deserialize(&tx_bytes[..]).expect_err("rk = identity should fail");
+}
+
+/// Reproduction for GHSA-rgwx-8r98-p34c:
+/// Coinbase Sapling spend vectors allocate before zero-spend consensus rule.
+///
+/// A V5 coinbase transaction with Sapling spends can be serialized and
+/// deserialized — the parser allocates Sapling spend vectors (bounded by
+/// `TrustedPreallocate::max_allocation()`) before any coinbase-specific
+/// check. The consensus rule rejecting coinbase Sapling spends only runs
+/// later in `zebra-consensus`, not during deserialization.
+#[test]
+fn coinbase_v5_with_sapling_spends_deserializes_successfully() {
+    let _init_guard = zebra_test::init();
+
+    let network = Network::Mainnet;
+
+    // Find a real V4 transaction with Sapling spends from the test block vectors.
+    let tx_with_spends = arbitrary::test_transactions(&network)
+        .find(|(_, tx)| tx.sapling_spends_per_anchor().count() > 0);
+
+    let Some((height, original_tx)) = tx_with_spends else {
+        panic!("test block vectors must contain at least one transaction with Sapling spends");
+    };
+
+    let original_spend_count = original_tx.sapling_spends_per_anchor().count();
+    assert!(
+        original_spend_count > 0,
+        "source transaction must have Sapling spends"
+    );
+
+    // Convert the V4 transaction to a fake V5 — this preserves valid Sapling data.
+    let fake_v5 = arbitrary::transaction_to_fake_v5(&original_tx, &network, height);
+
+    // Replace transparent inputs with a single coinbase input.
+    let Transaction::V5 {
+        lock_time,
+        expiry_height,
+        outputs,
+        sapling_shielded_data,
+        orchard_shielded_data,
+        ..
+    } = fake_v5
+    else {
+        panic!("transaction_to_fake_v5 must return V5");
+    };
+
+    // Confirm the fake V5 still has Sapling spends.
+    let sapling_shielded_data =
+        sapling_shielded_data.expect("converted V5 must retain Sapling shielded data with spends");
+
+    let coinbase_tx = Transaction::V5 {
+        network_upgrade: NetworkUpgrade::Nu5,
+        lock_time,
+        expiry_height,
+        inputs: vec![transparent::Input::Coinbase {
+            height,
+            data: transparent::CoinbaseData(vec![0x00; 4]),
+            sequence: 0xFFFF_FFFF,
+        }],
+        outputs: if outputs.is_empty() {
+            vec![transparent::Output {
+                value: crate::amount::Amount::zero(),
+                lock_script: Script::new(&[0u8; 20]),
+            }]
+        } else {
+            outputs
+        },
+        sapling_shielded_data: Some(sapling_shielded_data),
+        orchard_shielded_data,
+    };
+
+    // The constructed transaction must look like a coinbase with Sapling spends.
+    assert!(coinbase_tx.is_coinbase(), "transaction must be coinbase");
+    assert!(
+        coinbase_tx.sapling_spends_per_anchor().count() > 0,
+        "coinbase transaction has Sapling spends"
+    );
+
+    // Serialize it.
+    let serialized = coinbase_tx
+        .zcash_serialize_to_vec()
+        .expect("coinbase V5 with Sapling spends must serialize");
+
+    // Deserialize it — the parser must now reject coinbase transactions with
+    // Sapling spends before allocating spend vectors (GHSA-rgwx-8r98-p34c fix).
+    let err = serialized
+        .zcash_deserialize_into::<Transaction>()
+        .expect_err("coinbase with Sapling spends must be rejected during deserialization");
+
+    assert!(
+        err.to_string()
+            .contains("coinbase transaction must not have Sapling spends"),
+        "unexpected error: {err}"
+    );
 }
