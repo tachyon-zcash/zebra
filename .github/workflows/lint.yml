@@ -97,6 +97,32 @@ jobs:
       - uses: ./.github/actions/setup-zebra-build
       - run: cargo hack check --workspace
 
+  # Tachyon consensus code (v6 shielded data, aggregate proof verification) is
+  # gated behind `cfg(zcash_unstable = "nu7")`, which is set via RUSTFLAGS
+  # rather than a cargo feature. None of the other lint/build jobs set that cfg,
+  # so without this job the entire tachyon integration is never type-checked in
+  # CI. `zebra-test` provides the NU7 consensus branch id required under the cfg.
+  tachyon:
+    name: tachyon (nu7)
+    needs: changes
+    if: needs.changes.outputs.lint == 'true'
+    permissions:
+      contents: read
+      statuses: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RUSTFLAGS: '--cfg zcash_unstable="nu7"'
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd #v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 #v1.16.1
+        with:
+          cache-on-failure: true
+      - uses: ./.github/actions/setup-zebra-build
+      - run: cargo check --workspace --features tx_v6,zebra-test
+
   msrv:
     name: MSRV
     needs: changes
@@ -367,6 +393,7 @@ jobs:
       - changes
       - clippy
       - crate-checks
+      - tachyon
       - msrv
       - docs
       - fmt
@@ -384,4 +411,4 @@ jobs:
         uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe #v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
-          allowed-skips: clippy, crate-checks, msrv, docs, fmt, unused-deps, check-cargo-lock, no-test-deps, features, deny, vet, hadolint, shellcheck
+          allowed-skips: clippy, crate-checks, tachyon, msrv, docs, fmt, unused-deps, check-cargo-lock, no-test-deps, features, deny, vet, hadolint, shellcheck

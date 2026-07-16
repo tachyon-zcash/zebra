@@ -117,12 +117,15 @@ pub fn verify_tachyon_aggregates(block: &Block) -> Result<(), BlockError> {
             ..
         } = tx.as_ref()
         {
-            let (_, actions) = groups.get_mut(&<[u8; 64]>::from(bundle.stamp)).ok_or_else(|| {
-                BlockError::Other(
+            let (_, actions) =
+                groups
+                    .get_mut(&<[u8; 64]>::from(bundle.stamp))
+                    .ok_or_else(|| {
+                        BlockError::Other(
                     "stripped tachyon bundle references a wtxid with no stamped bundle in the block"
                         .to_string(),
                 )
-            })?;
+                    })?;
             actions.extend(bundle.actions.iter().cloned());
         }
     }
