@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+## [Zebra 6.2.3](https://github.com/ZcashFoundation/zebra/releases/tag/v6.2.3) - 2026-07-25
+
+### Changed
+
+- Updated the following local packages: zebra-chain, zebra-state, zebra-consensus, zebra-node-services, zebra-script, zebra-network, zebra-rpc, zebra-utils
+
 ## [Zebra 6.2.2](https://github.com/ZcashFoundation/zebra/releases/tag/v6.2.2) - 2026-07-24
 
 ### Changed
