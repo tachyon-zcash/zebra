@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+## [Zebra 6.2.4](https://github.com/ZcashFoundation/zebra/releases/tag/v6.2.4) - 2026-07-30
+
+### Changed
+
+- Updated the following local packages: zebra-chain, zebra-state, zebra-consensus, zebra-network, zebra-node-services, zebra-script, zebra-rpc, zebra-utils
+
 ### Added
 
 - Added `seeder.zec.rocks` and `seeder.testnet.zec.rocks` as default DNS seeders

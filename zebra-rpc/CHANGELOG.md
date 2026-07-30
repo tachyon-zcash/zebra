@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [15.0.1] - 2026-07-30
+
+### Changed
+
+- Updated the following local packages: zebra-chain, zebra-state, zebra-consensus, zebra-network, zebra-node-services, zebra-script
+
 ### Fixed
 
 - Clarified the error message returned by `getrawtransaction` for transactions
