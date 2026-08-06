@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [15.0.1] - 2026-08-06
+
+### Changed
+
+- Updated the following local packages: zebra-chain, zebra-state, zebra-consensus, zebra-network, zebra-node-services, zebra-script
+
 ### Changed
 
 - Test utilities construct fake history trees with the Tachyon pool anchor root added
