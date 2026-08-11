@@ -38,7 +38,12 @@ orchard = "0.15.0"
 # See the diffs against the tachyon-zcash `main` branches here:
 #   zcash_tachyon: https://github.com/tachyon-zcash/tachyon/compare/main...s1nus:tachyon:cnode-working
 #   ragu:          https://github.com/tachyon-zcash/ragu/compare/main...s1nus:ragu:cnode-working
-zcash_tachyon = {git = "https://github.com/s1nus/tachyon", branch = "cnode-working"}
+# zcash_tachyon is pinned to an exact rev because cargo-semver-checks builds
+# rustdoc in a scratch workspace that re-resolves branch deps to their HEAD,
+# and cnode-working HEAD now carries an Anchor API (EpochIndex arguments) that
+# is incompatible with this tree's call sites. A follow-up dep PR moves to
+# tachyon-zcash/tachyon `main` and updates the call sites.
+zcash_tachyon = {git = "https://github.com/s1nus/tachyon", rev = "c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4"}
 ragu = {git = "https://github.com/s1nus/ragu", branch = "cnode-working", default-features = false, features = ["mock"]}
 sapling-crypto = "0.7"
 # librustzcash crates track the tachyon-zcash fork's `main` branch. See its diff
