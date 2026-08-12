@@ -4138,7 +4138,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03da047801ff44bb6a4d407d4860c05fd70bb81714e6b2f3812603d5b145b042"
 dependencies = [
  "heck",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "petgraph",
@@ -4159,7 +4159,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b570b25f7617e43d59005d0990ccb79e950a423952cea19671b7a876da390adf"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -4334,7 +4334,7 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 [[package]]
 name = "ragu"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#eda373435d851107533762a990124993ce6cb89c"
+source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
 dependencies = [
  "blake2b_simd",
  "ragu_arithmetic",
@@ -4348,7 +4348,7 @@ dependencies = [
 [[package]]
 name = "ragu_arithmetic"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#eda373435d851107533762a990124993ce6cb89c"
+source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
 dependencies = [
  "ff",
  "group",
@@ -4361,7 +4361,7 @@ dependencies = [
 [[package]]
 name = "ragu_circuits"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#eda373435d851107533762a990124993ce6cb89c"
+source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
 dependencies = [
  "blake2b_simd",
  "maybe-rayon 0.1.1 (git+https://github.com/tachyon-zcash/maybe-rayon.git?rev=5c37ee0dd448e8c1edc4529d0b8897ecaff5aad1)",
@@ -4373,7 +4373,7 @@ dependencies = [
 [[package]]
 name = "ragu_core"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#eda373435d851107533762a990124993ce6cb89c"
+source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
 dependencies = [
  "ragu_arithmetic",
  "ragu_macros",
@@ -4383,7 +4383,7 @@ dependencies = [
 [[package]]
 name = "ragu_macros"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#eda373435d851107533762a990124993ce6cb89c"
+source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -4396,7 +4396,7 @@ dependencies = [
 [[package]]
 name = "ragu_pasta"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#eda373435d851107533762a990124993ce6cb89c"
+source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
 dependencies = [
  "lazy_static",
  "ragu_arithmetic",
@@ -4405,7 +4405,7 @@ dependencies = [
 [[package]]
 name = "ragu_pcd"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#eda373435d851107533762a990124993ce6cb89c"
+source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
 dependencies = [
  "maybe-rayon 0.1.1 (git+https://github.com/tachyon-zcash/maybe-rayon.git?rev=5c37ee0dd448e8c1edc4529d0b8897ecaff5aad1)",
  "ragu_arithmetic",
@@ -4417,7 +4417,7 @@ dependencies = [
 [[package]]
 name = "ragu_primitives"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#eda373435d851107533762a990124993ce6cb89c"
+source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
 dependencies = [
  "ragu_arithmetic",
  "ragu_core",
@@ -7261,7 +7261,7 @@ dependencies = [
  "zcash_note_encryption",
  "zcash_protocol",
  "zcash_script",
- "zcash_tachyon",
+ "zcash_tachyon 0.0.0 (git+https://github.com/s1nus/tachyon?branch=cnode-working)",
  "zcash_transparent",
 ]
 
@@ -7328,7 +7328,24 @@ dependencies = [
 [[package]]
 name = "zcash_tachyon"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/tachyon?branch=cnode-working#c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4"
+source = "git+https://github.com/s1nus/tachyon?branch=cnode-working#b9cb1edb72754cd6024222fe23558aef28bb5138"
+dependencies = [
+ "blake2b_simd",
+ "corez",
+ "derive_more",
+ "ff",
+ "group",
+ "lazy_static",
+ "pasta_curves",
+ "ragu",
+ "rand_core 0.6.4",
+ "reddsa",
+]
+
+[[package]]
+name = "zcash_tachyon"
+version = "0.0.0"
+source = "git+https://github.com/s1nus/tachyon?rev=c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4#c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4"
 dependencies = [
  "blake2b_simd",
  "corez",
@@ -7435,7 +7452,7 @@ dependencies = [
  "zcash_primitives",
  "zcash_protocol",
  "zcash_script",
- "zcash_tachyon",
+ "zcash_tachyon 0.0.0 (git+https://github.com/s1nus/tachyon?rev=c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4)",
  "zcash_transparent",
  "zebra-test",
 ]
@@ -7485,7 +7502,7 @@ dependencies = [
  "zcash_proofs",
  "zcash_protocol",
  "zcash_script",
- "zcash_tachyon",
+ "zcash_tachyon 0.0.0 (git+https://github.com/s1nus/tachyon?rev=c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4)",
  "zcash_transparent",
  "zebra-chain",
  "zebra-node-services",
@@ -7679,7 +7696,7 @@ dependencies = [
  "tokio",
  "tower 0.4.13",
  "tracing",
- "zcash_tachyon",
+ "zcash_tachyon 0.0.0 (git+https://github.com/s1nus/tachyon?rev=c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4)",
  "zebra-chain",
  "zebra-node-services",
  "zebra-test",
