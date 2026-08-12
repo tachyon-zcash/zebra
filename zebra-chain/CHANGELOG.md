@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [12.0.0] - 2026-08-12
+
 ### Breaking Changes
 
 - Added the `ValueBalanceError::Total` variant returned when the sum of value
