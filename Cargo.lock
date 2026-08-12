@@ -1448,7 +1448,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1624,7 +1624,7 @@ dependencies = [
 [[package]]
 name = "equihash"
 version = "0.3.0"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "blake2b_simd",
  "cc",
@@ -1656,7 +1656,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1672,7 +1672,7 @@ dependencies = [
 [[package]]
 name = "f4jumble"
 version = "0.1.1"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "blake2b_simd",
 ]
@@ -2694,7 +2694,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2924,7 +2924,7 @@ version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a1886916523694cd6ea3d175f03a1e5010699a2a4cc13696d83d7bea1d80638"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3283,7 +3283,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4301,7 +4301,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4334,7 +4334,7 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 [[package]]
 name = "ragu"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
+source = "git+https://github.com/tachyon-zcash/ragu?rev=284882da60128b03ca210b32793c17aea5103a8e#284882da60128b03ca210b32793c17aea5103a8e"
 dependencies = [
  "blake2b_simd",
  "ragu_arithmetic",
@@ -4348,7 +4348,7 @@ dependencies = [
 [[package]]
 name = "ragu_arithmetic"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
+source = "git+https://github.com/tachyon-zcash/ragu?rev=284882da60128b03ca210b32793c17aea5103a8e#284882da60128b03ca210b32793c17aea5103a8e"
 dependencies = [
  "ff",
  "group",
@@ -4361,7 +4361,7 @@ dependencies = [
 [[package]]
 name = "ragu_circuits"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
+source = "git+https://github.com/tachyon-zcash/ragu?rev=284882da60128b03ca210b32793c17aea5103a8e#284882da60128b03ca210b32793c17aea5103a8e"
 dependencies = [
  "blake2b_simd",
  "maybe-rayon 0.1.1 (git+https://github.com/tachyon-zcash/maybe-rayon.git?rev=5c37ee0dd448e8c1edc4529d0b8897ecaff5aad1)",
@@ -4373,7 +4373,7 @@ dependencies = [
 [[package]]
 name = "ragu_core"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
+source = "git+https://github.com/tachyon-zcash/ragu?rev=284882da60128b03ca210b32793c17aea5103a8e#284882da60128b03ca210b32793c17aea5103a8e"
 dependencies = [
  "ragu_arithmetic",
  "ragu_macros",
@@ -4383,7 +4383,7 @@ dependencies = [
 [[package]]
 name = "ragu_macros"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
+source = "git+https://github.com/tachyon-zcash/ragu?rev=284882da60128b03ca210b32793c17aea5103a8e#284882da60128b03ca210b32793c17aea5103a8e"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -4396,7 +4396,7 @@ dependencies = [
 [[package]]
 name = "ragu_pasta"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
+source = "git+https://github.com/tachyon-zcash/ragu?rev=284882da60128b03ca210b32793c17aea5103a8e#284882da60128b03ca210b32793c17aea5103a8e"
 dependencies = [
  "lazy_static",
  "ragu_arithmetic",
@@ -4405,7 +4405,7 @@ dependencies = [
 [[package]]
 name = "ragu_pcd"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
+source = "git+https://github.com/tachyon-zcash/ragu?rev=284882da60128b03ca210b32793c17aea5103a8e#284882da60128b03ca210b32793c17aea5103a8e"
 dependencies = [
  "maybe-rayon 0.1.1 (git+https://github.com/tachyon-zcash/maybe-rayon.git?rev=5c37ee0dd448e8c1edc4529d0b8897ecaff5aad1)",
  "ragu_arithmetic",
@@ -4417,7 +4417,7 @@ dependencies = [
 [[package]]
 name = "ragu_primitives"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/ragu?branch=cnode-working#337643f58a0f0c6a21390892b49320e0198e0909"
+source = "git+https://github.com/tachyon-zcash/ragu?rev=284882da60128b03ca210b32793c17aea5103a8e#284882da60128b03ca210b32793c17aea5103a8e"
 dependencies = [
  "ragu_arithmetic",
  "ragu_core",
@@ -4915,7 +4915,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4974,7 +4974,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5760,10 +5760,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6897,7 +6897,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7151,7 +7151,7 @@ dependencies = [
 [[package]]
 name = "zcash_address"
 version = "0.13.0"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "bech32",
  "bs58",
@@ -7175,7 +7175,7 @@ dependencies = [
 [[package]]
 name = "zcash_encoding"
 version = "0.5.0"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "corez",
  "hex",
@@ -7185,7 +7185,7 @@ dependencies = [
 [[package]]
 name = "zcash_history"
 version = "0.6.0"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "blake2b_simd",
  "corez",
@@ -7196,7 +7196,7 @@ dependencies = [
 [[package]]
 name = "zcash_keys"
 version = "0.16.1"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "bech32",
  "blake2b_simd",
@@ -7236,7 +7236,7 @@ dependencies = [
 [[package]]
 name = "zcash_primitives"
 version = "0.30.0"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "blake2b_simd",
  "block-buffer 0.11.0-rc.3",
@@ -7261,14 +7261,14 @@ dependencies = [
  "zcash_note_encryption",
  "zcash_protocol",
  "zcash_script",
- "zcash_tachyon 0.0.0 (git+https://github.com/s1nus/tachyon?branch=cnode-working)",
+ "zcash_tachyon",
  "zcash_transparent",
 ]
 
 [[package]]
 name = "zcash_proofs"
 version = "0.30.0"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "bellman",
  "blake2b_simd",
@@ -7290,7 +7290,7 @@ dependencies = [
 [[package]]
 name = "zcash_protocol"
 version = "0.10.4"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "corez",
  "document-features",
@@ -7328,24 +7328,7 @@ dependencies = [
 [[package]]
 name = "zcash_tachyon"
 version = "0.0.0"
-source = "git+https://github.com/s1nus/tachyon?branch=cnode-working#b9cb1edb72754cd6024222fe23558aef28bb5138"
-dependencies = [
- "blake2b_simd",
- "corez",
- "derive_more",
- "ff",
- "group",
- "lazy_static",
- "pasta_curves",
- "ragu",
- "rand_core 0.6.4",
- "reddsa",
-]
-
-[[package]]
-name = "zcash_tachyon"
-version = "0.0.0"
-source = "git+https://github.com/s1nus/tachyon?rev=c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4#c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4"
+source = "git+https://github.com/tachyon-zcash/tachyon?branch=main#7b48464e5a1d8b8353341617afbdcc4091d489f5"
 dependencies = [
  "blake2b_simd",
  "corez",
@@ -7362,7 +7345,7 @@ dependencies = [
 [[package]]
 name = "zcash_transparent"
 version = "0.10.0"
-source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#575a031ed8be8379547942407568ec14b57ef3d9"
+source = "git+https://github.com/tachyon-zcash/librustzcash?branch=main#535167acf61fb6769d3dcd133e04d7e2c1c12a73"
 dependencies = [
  "bip32",
  "bs58",
@@ -7452,7 +7435,7 @@ dependencies = [
  "zcash_primitives",
  "zcash_protocol",
  "zcash_script",
- "zcash_tachyon 0.0.0 (git+https://github.com/s1nus/tachyon?rev=c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4)",
+ "zcash_tachyon",
  "zcash_transparent",
  "zebra-test",
 ]
@@ -7502,7 +7485,7 @@ dependencies = [
  "zcash_proofs",
  "zcash_protocol",
  "zcash_script",
- "zcash_tachyon 0.0.0 (git+https://github.com/s1nus/tachyon?rev=c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4)",
+ "zcash_tachyon",
  "zcash_transparent",
  "zebra-chain",
  "zebra-node-services",
@@ -7696,7 +7679,7 @@ dependencies = [
  "tokio",
  "tower 0.4.13",
  "tracing",
- "zcash_tachyon 0.0.0 (git+https://github.com/s1nus/tachyon?rev=c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4)",
+ "zcash_tachyon",
  "zebra-chain",
  "zebra-node-services",
  "zebra-test",

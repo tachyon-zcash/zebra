@@ -1178,7 +1178,7 @@ fn verify_v6_transaction_network_upgrade(
     }
 }
 
-/// Verifies a V7 (NU7 / tachyon) transaction.
+/// Verifies a V7 (ZFuture / tachyon) transaction.
 ///
 /// Runs the v6 checks on the shared components (transparent, Sapling, Orchard, and Ironwood
 /// bundles), plus the tachyon bundle's transaction-level semantic checks:
@@ -1207,7 +1207,7 @@ fn verify_v7_transaction(
     let orchard_bundle = cached_ffi_transaction.sighasher().orchard_bundle();
     let ironwood_bundle = cached_ffi_transaction.sighasher().ironwood_bundle();
 
-    // The NU7 sighash (computed through librustzcash) commits to the tachyon bundle's
+    // The ZFuture sighash (computed through librustzcash) commits to the tachyon bundle's
     // effecting data (`TachyonBundle::commitment()`: `hActionsTachyon` and
     // `valueBalanceTachyon`), so the tachyon signatures verified below transitively commit
     // to the bundle itself. The stamp is excluded as malleable authorizing data.
@@ -1226,18 +1226,17 @@ fn verify_v7_transaction(
 
 /// Verifies that a V7 `transaction` is supported by `network_upgrade`.
 ///
-/// V7 transactions are only valid from NU7 onward.
+/// V7 transactions are only valid from ZFuture onward; NU7 itself is the
+/// upstream (v6 transaction) upgrade.
 fn verify_v7_transaction_network_upgrade(
     transaction: &Transaction,
     network_upgrade: NetworkUpgrade,
 ) -> Result<(), TransactionError> {
     match network_upgrade {
-        NetworkUpgrade::Nu7 => Ok(()),
-
         #[cfg(zcash_unstable = "zfuture")]
         NetworkUpgrade::ZFuture => Ok(()),
 
-        // V7 transactions are not valid before NU7.
+        // V7 transactions are not valid before ZFuture.
         NetworkUpgrade::Genesis
         | NetworkUpgrade::BeforeOverwinter
         | NetworkUpgrade::Overwinter
@@ -1249,7 +1248,8 @@ fn verify_v7_transaction_network_upgrade(
         | NetworkUpgrade::Nu6
         | NetworkUpgrade::Nu6_1
         | NetworkUpgrade::Nu6_2
-        | NetworkUpgrade::Nu6_3 => Err(TransactionError::UnsupportedByNetworkUpgrade(
+        | NetworkUpgrade::Nu6_3
+        | NetworkUpgrade::Nu7 => Err(TransactionError::UnsupportedByNetworkUpgrade(
             transaction.version(),
             network_upgrade,
         )),

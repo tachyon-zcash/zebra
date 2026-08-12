@@ -68,7 +68,7 @@ pub(crate) fn no_duplicates_in_finalized_chain(
 }
 
 /// Reject duplicate tachygrams within the two-epoch scan window against the finalized
-/// state (NU7).
+/// state (ZFuture).
 ///
 /// A tachygram MUST NOT be revealed twice within the block's own epoch or the immediately
 /// preceding one; see [`zebra_chain::tachyon::within_scan_window`] for why the window spans

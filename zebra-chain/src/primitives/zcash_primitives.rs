@@ -142,9 +142,6 @@ impl zp_tx::Authorization for PrecomputedAuth {
     type TransparentAuth = TransparentAuth;
     type SaplingAuth = sapling_crypto::bundle::Authorized;
     type OrchardAuth = orchard::bundle::Authorized;
-
-    #[cfg(zcash_unstable = "zfuture")]
-    type TzeAuth = zp_tx::components::tze::Authorized;
 }
 
 // End of (mostly) copied code
@@ -264,13 +261,9 @@ impl PrecomputedTxData {
             },
         };
 
-        let tx_data: zp_tx::TransactionData<PrecomputedAuth> = tx.into_data().map_authorization(
-            f_transparent,
-            IdentityMap,
-            IdentityMap,
-            #[cfg(zcash_unstable = "zfuture")]
-            (),
-        );
+        let tx_data: zp_tx::TransactionData<PrecomputedAuth> =
+            tx.into_data()
+                .map_authorization(f_transparent, IdentityMap, IdentityMap);
 
         Ok(PrecomputedTxData {
             tx_data,

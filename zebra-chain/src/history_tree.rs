@@ -52,9 +52,9 @@ enum InnerHistoryTree {
     PreOrchard(Tree<PreOrchard>),
     /// An Orchard-onward tree (NU5 to pre-NU6.3).
     OrchardOnward(Tree<OrchardOnward>),
-    /// An Ironwood-onward tree (NU6.3 to pre-NU7), which also commits to the Ironwood pool.
+    /// An Ironwood-onward tree (NU6.3 to pre-ZFuture), which also commits to the Ironwood pool.
     IronwoodOnward(Tree<IronwoodOnward>),
-    /// A Tachyon-onward tree (NU7 onward), which also commits to the Tachyon pool anchor.
+    /// A Tachyon-onward tree (ZFuture onward), which also commits to the Tachyon pool anchor.
     TachyonOnward(Tree<TachyonOnward>),
 }
 
@@ -120,7 +120,7 @@ impl NonEmptyHistoryTree {
                 )?;
                 InnerHistoryTree::OrchardOnward(tree)
             }
-            NetworkUpgrade::Nu6_3 => {
+            NetworkUpgrade::Nu6_3 | NetworkUpgrade::Nu7 => {
                 let tree = Tree::<IronwoodOnward>::new_from_cache(
                     network,
                     network_upgrade,
@@ -129,16 +129,6 @@ impl NonEmptyHistoryTree {
                     &Default::default(),
                 )?;
                 InnerHistoryTree::IronwoodOnward(tree)
-            }
-            NetworkUpgrade::Nu7 => {
-                let tree = Tree::<TachyonOnward>::new_from_cache(
-                    network,
-                    network_upgrade,
-                    size,
-                    &peaks,
-                    &Default::default(),
-                )?;
-                InnerHistoryTree::TachyonOnward(tree)
             }
 
             #[cfg(zcash_unstable = "zfuture")]
@@ -196,13 +186,9 @@ impl NonEmptyHistoryTree {
                 let (tree, entry) = Tree::<OrchardOnward>::new_from_block(network, block, roots)?;
                 (InnerHistoryTree::OrchardOnward(tree), entry)
             }
-            NetworkUpgrade::Nu6_3 => {
+            NetworkUpgrade::Nu6_3 | NetworkUpgrade::Nu7 => {
                 let (tree, entry) = Tree::<IronwoodOnward>::new_from_block(network, block, roots)?;
                 (InnerHistoryTree::IronwoodOnward(tree), entry)
-            }
-            NetworkUpgrade::Nu7 => {
-                let (tree, entry) = Tree::<TachyonOnward>::new_from_block(network, block, roots)?;
-                (InnerHistoryTree::TachyonOnward(tree), entry)
             }
 
             #[cfg(zcash_unstable = "zfuture")]

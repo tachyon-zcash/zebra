@@ -22,6 +22,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ([tachyon-zcash/zebra#63](https://github.com/tachyon-zcash/zebra/pull/63))
 - `Transaction::tachyon_tachygrams` and `Block::tachyon_transactions_count`
 
+### Changed
+
+- `zcash_tachyon` now tracks the tachyon-zcash `main` branch. The V7 tachyon
+  bundle wire format gains the bundle memo payload and the proof stamp's
+  carried tachygram-set commitment, and anchor steps are bound to the epoch of
+  the block, so `tachyon::Anchor::advance_with_block` produces different
+  anchors for the same blocks
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+- Tachyon moves from NU7 to the restored ZFuture network upgrade, following
+  librustzcash `main` (which now gates tachyon behind
+  `zcash_unstable = "zfuture"`). This fork always compiles with both the `nu7`
+  and `zfuture` cfgs: `NetworkUpgrade::ZFuture` (consensus branch id
+  `0xfffffffd`) activates the Tachyon pool (`tachyon::pool_height`), V7
+  transactions carry ZFuture and serialize its branch id, and the V4
+  (Tachyon-onward) history tree starts at ZFuture while NU7 reverts to the
+  Ironwood (V3) tree
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+
 ### Fixed
 
 - Comments in `zebra-chain/src/transaction/tests/vectors.rs`

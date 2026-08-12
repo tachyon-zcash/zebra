@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The finalized and non-finalized state track the Tachyon pool (NU7): per-block and
+- The finalized and non-finalized state track the Tachyon pool (ZFuture): per-block and
   epoch-boundary anchors and revealed tachygrams, stored in the new `tachyon_anchors`,
   `tachyon_anchor_by_height`, `tachyon_epoch_anchor_by_epoch`, and
   `tachyon_tachygrams` column families (database format version 29). Contextual
@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   proof-stamp anchors that are not end-of-block anchors from that window, with new
   `ValidateContextError` variants
   ([tachyon-zcash/zebra#63](https://github.com/tachyon-zcash/zebra/pull/63))
+
+### Changed
+
+- The Tachyon pool now starts at the ZFuture network upgrade instead of NU7, following
+  librustzcash's move of tachyon behind `zcash_unstable = "zfuture"`. Anchor and tachygram
+  tracking key off ZFuture activation via `zebra_chain::tachyon::pool_height`
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
 
 ## [13.0.0] - 2026-08-10
 

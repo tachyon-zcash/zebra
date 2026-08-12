@@ -546,6 +546,9 @@ pub enum BlockError {
     )]
     TachyonDuplicateAction,
 
+    #[error("tachyon proof stamp MUST publish exactly two tachygrams for every covered action")]
+    TachyonTachygramArityMismatch,
+
     // TODO: the underlying error is zcash_tachyon's stamp::VerificationError, but it does not
     // implement Clone/PartialEq as required here.
     #[error("tachyon proof stamp MUST verify: {0}")]
@@ -591,6 +594,7 @@ impl BlockError {
             | DuplicateTachygram
             | TachyonAggregateNotFound
             | TachyonCoverageMismatch
+            | TachyonTachygramArityMismatch
             | TachyonProofInvalid(_) => 100,
             Transaction(err) => err.mempool_misbehavior_score(),
             _other => 0,

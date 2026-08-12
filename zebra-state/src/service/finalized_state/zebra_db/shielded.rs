@@ -146,7 +146,7 @@ impl ZebraDb {
     }
 
     /// Returns the height of the finalized block whose end-of-block anchor is
-    /// `tachyon_anchor`, if it is within the retained two-epoch window (NU7).
+    /// `tachyon_anchor`, if it is within the retained two-epoch window (ZFuture).
     ///
     /// Anchors older than the previous epoch are pruned along with the tachygram working
     /// set: they can no longer be referenced by proof stamps (see
@@ -158,7 +158,7 @@ impl ZebraDb {
     }
 
     /// Returns the Tachyon pool anchor after the finalized tip, or the default (pre-pool)
-    /// anchor if the Tachyon pool has not started (NU7, experimental).
+    /// anchor if the Tachyon pool has not started (ZFuture, experimental).
     pub fn tachyon_anchor_for_tip(&self) -> tachyon::Anchor {
         let tachyon_anchor_by_height = self.db.cf_handle("tachyon_anchor_by_height").unwrap();
         self.db
@@ -168,7 +168,7 @@ impl ZebraDb {
     }
 
     /// Returns the height of the finalized block that revealed `tachygram`, if it is in the
-    /// retained working set (NU7).
+    /// retained working set (ZFuture).
     ///
     /// The working set retains the finalized tip's epoch and the one before it; older entries
     /// are pruned when an epoch-first block is finalized. Callers must still compare epochs
@@ -184,7 +184,7 @@ impl ZebraDb {
     }
 
     /// Returns the Tachyon epoch-boundary anchor for `epoch`, if an epoch-first block that
-    /// started it has been finalized (NU7, experimental).
+    /// started it has been finalized (ZFuture, experimental).
     #[allow(clippy::unwrap_in_result)]
     pub fn tachyon_epoch_anchor(&self, epoch: u32) -> Option<tachyon::Anchor> {
         let tachyon_epoch_anchor_by_epoch =
@@ -194,7 +194,7 @@ impl ZebraDb {
     }
 
     /// Returns the current Tachyon epoch at the finalized tip, if the pool has started
-    /// (NU7, experimental).
+    /// (ZFuture, experimental).
     #[allow(clippy::unwrap_in_result)]
     pub fn tachyon_current_epoch(&self) -> Option<u32> {
         let tachyon_epoch_anchor_by_epoch =
@@ -686,7 +686,7 @@ impl DiskWriteBatch {
         self.prepare_tachyon_tachygram_batch(zebra_db, finalized);
     }
 
-    /// Prepare a database batch containing `finalized.block`'s tachygrams (NU7), pruning
+    /// Prepare a database batch containing `finalized.block`'s tachygrams (ZFuture), pruning
     /// entries that leave the two-epoch scan window when the block starts a new epoch.
     ///
     /// Tachygrams are scanned over a two-epoch window — the block's own epoch and the one
@@ -863,8 +863,8 @@ impl DiskWriteBatch {
         }
 
         // Store the Tachyon pool anchor only if it has changed. The anchor changes with
-        // every block once the pool starts at NU7 (even stamp-less blocks tick it), so
-        // this skips exactly the pre-NU7 blocks, keeping the default (pre-pool) anchor
+        // every block once the pool starts at ZFuture (even stamp-less blocks tick it), so
+        // this skips exactly the pre-ZFuture blocks, keeping the default (pre-pool) anchor
         // out of the anchor index.
         let prev_tachyon_anchor = prev_note_commitment_trees.as_ref().map_or_else(
             || zebra_db.tachyon_anchor_for_tip(),
@@ -880,7 +880,7 @@ impl DiskWriteBatch {
         // tracked only in the per-epoch index, not the stamp-anchor membership index.
         if let Some(epoch_anchor) = note_commitment_trees.tachyon_epoch_anchor {
             let epoch = tachyon::epoch(&zebra_db.network(), *height)
-                .expect("blocks carrying an epoch anchor are NU7-onward");
+                .expect("blocks carrying an epoch anchor are ZFuture-onward");
             let tachyon_epoch_anchor_by_epoch = zebra_db
                 .db
                 .cf_handle("tachyon_epoch_anchor_by_epoch")
@@ -1072,7 +1072,7 @@ impl DiskWriteBatch {
         self.insert_note_commitment_subtree(zebra_db, "ironwood_note_commitment_subtree", subtree);
     }
 
-    // Tachyon anchor methods (NU7, experimental; Tachyon has no note commitment tree)
+    // Tachyon anchor methods (ZFuture, experimental; Tachyon has no note commitment tree)
 
     /// Inserts or overwrites the Tachyon pool anchor at the given [`Height`],
     /// and adds it to the anchor membership index (which records the height, so the

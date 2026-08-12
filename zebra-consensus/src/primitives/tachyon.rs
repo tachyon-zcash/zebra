@@ -1,4 +1,4 @@
-//! Asynchronous verification of tachyon proof stamps (NU7, experimental).
+//! Asynchronous verification of tachyon proof stamps (ZFuture, experimental).
 //!
 //! Ragu proofs are currently mocks, so this is a plain [`spawn_fifo`] call rather than a
 //! `Batch`/`Fallback` service like [`super::halo2`]. Keep [`verify_proof_stamp`] as the only

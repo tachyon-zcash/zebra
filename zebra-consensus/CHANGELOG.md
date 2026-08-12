@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validation over the two-epoch scan window
   ([tachyon-zcash/zebra#63](https://github.com/tachyon-zcash/zebra/pull/63))
 
+### Added
+
+- `error::BlockError::TachyonTachygramArityMismatch`: block verification now
+  rejects a proof stamp that does not publish exactly two tachygrams for every
+  covered action, mapping `zcash_tachyon`'s new coverage rule
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+
+### Changed
+
+- V7 (tachyon) transactions are valid from the ZFuture network upgrade instead
+  of NU7; a V7 transaction under NU7 is now rejected with
+  `UnsupportedByNetworkUpgrade`. NU7 keeps the upstream v6-transaction rules
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+
 ## [15.0.0] - 2026-08-10
 
 ### Breaking Changes
