@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Tachyon (v7 transactions) now activates at the ZFuture network upgrade instead of NU7,
+  following librustzcash's move of tachyon behind `zcash_unstable = "zfuture"`. NU7 is now
+  the upstream v6-transaction upgrade, and `zebrad` builds with both
+  `zcash_unstable = "nu7"` and `zcash_unstable = "zfuture"`. Tachyon state written by an
+  earlier build activates at a different height and cannot be reused
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+
 ## [Zebra 6.3.0](https://github.com/ZcashFoundation/zebra/releases/tag/v6.3.0) - 2026-08-10
 
 ### Added

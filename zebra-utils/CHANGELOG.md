@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Requires `zebra-chain` 12.0.0. Tachyon (v7 transactions) moves from NU7 to the ZFuture
+  network upgrade, so these tools must be built with both `zcash_unstable = "nu7"` and
+  `zcash_unstable = "zfuture"`
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+
 ## [10.0.1] - 2026-08-10
 
 ### Changed

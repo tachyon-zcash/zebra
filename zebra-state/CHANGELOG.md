@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Requires `zebra-chain` 12.0.0, and the Tachyon pool's activation moves from NU7 to the
+  ZFuture network upgrade. Anchors and tachygrams recorded under the previous NU7-based
+  pool heights no longer match, so an existing Tachyon state cannot be reused
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+
 ### Added
 
 - The finalized and non-finalized state track the Tachyon pool (ZFuture): per-block and
