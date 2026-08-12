@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+## [Zebra 6.3.1](https://github.com/ZcashFoundation/zebra/releases/tag/v6.3.1) - 2026-08-12
+
 ### Breaking Changes
 
 - Tachyon (v7 transactions) now activates at the ZFuture network upgrade instead of NU7,

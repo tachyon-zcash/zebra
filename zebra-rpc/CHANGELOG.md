@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [16.0.1] - 2026-08-12
+
+### Changed
+
+- Updated the following local packages: zebra-chain, zebra-state, zebra-consensus, zebra-node-services, zebra-script, zebra-network
+
 ### Breaking Changes
 
 - Requires `zebra-chain` 12.0.0, whose block and transaction types appear in RPC request

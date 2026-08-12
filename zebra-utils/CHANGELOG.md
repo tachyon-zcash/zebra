@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.0.2] - 2026-08-12
+
+### Changed
+
+- Updated the following local packages: zebra-chain, zebra-node-services, zebra-rpc
+
 ### Breaking Changes
 
 - Requires `zebra-chain` 12.0.0. Tachyon (v7 transactions) moves from NU7 to the ZFuture

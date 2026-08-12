@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.0.1] - 2026-08-12
+
 ### Breaking Changes
 
 - Requires `zebra-chain` 12.0.0, and the Tachyon pool's activation moves from NU7 to the
