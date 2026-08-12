@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- Requires `zebra-chain` 12.0.0, and the Tachyon pool's activation moves from NU7 to the
+  ZFuture network upgrade. Anchors and tachygrams recorded under the previous NU7-based
+  pool heights no longer match, so an existing Tachyon state cannot be reused
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+
 ### Added
 
-- The finalized and non-finalized state track the Tachyon pool (NU7): per-block and
+- The finalized and non-finalized state track the Tachyon pool (ZFuture): per-block and
   epoch-boundary anchors and revealed tachygrams, stored in the new `tachyon_anchors`,
   `tachyon_anchor_by_height`, `tachyon_epoch_anchor_by_epoch`, and
   `tachyon_tachygrams` column families (database format version 29). Contextual
@@ -18,12 +25,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValidateContextError` variants
   ([tachyon-zcash/zebra#63](https://github.com/tachyon-zcash/zebra/pull/63))
 
+### Changed
+
+- The Tachyon pool now starts at the ZFuture network upgrade instead of NU7, following
+  librustzcash's move of tachyon behind `zcash_unstable = "zfuture"`. Anchor and tachygram
+  tracking key off ZFuture activation via `zebra_chain::tachyon::pool_height`
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+
+## [13.0.0] - 2026-08-10
+
+### Breaking Changes
+
+- Requires `zebra-chain` 12.0.0 and `zebra-node-services` 10.0.0, whose types and service traits
+  appear in this crate's public API.
+
 ### Fixed
 
 - `init_read_only()` now returns `StateInitError::ReadOnlyEphemeralConflict` for a config with
   `ephemeral = true`, even when the configured `cache_dir` is missing or unreadable. Previously the
   cache directory was checked first, so this configuration error surfaced as
-  `StateInitError::ReadOnlyCacheDirUnreadable`.
+  `StateInitError::ReadOnlyCacheDirUnreadable`
+  ([#11146](https://github.com/ZcashFoundation/zebra/pull/11146)).
 
 ## [12.0.1] - 2026-07-27
 

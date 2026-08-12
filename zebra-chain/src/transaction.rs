@@ -1280,7 +1280,7 @@ impl Transaction {
 
     // tachyon
 
-    /// Access the tachyon shielded data in this transaction (NU7), if there is any,
+    /// Access the tachyon shielded data in this transaction (ZFuture), if there is any,
     /// regardless of version. It only appears in v7 transactions.
     pub fn tachyon_shielded_data(&self) -> Option<&TachyonShieldedData> {
         match self {
@@ -1686,7 +1686,7 @@ impl Transaction {
         ValueBalance::from_ironwood_amount(ironwood_value_balance)
     }
 
-    /// Return the tachyon value balance (NU7), the change in the transaction value
+    /// Return the tachyon value balance (ZFuture), the change in the transaction value
     /// pool due to tachyon actions.
     ///
     /// Positive values are added to this transaction's value pool, and removed from the tachyon

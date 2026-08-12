@@ -107,6 +107,8 @@ fn activates_network_upgrades_correctly() {
     let network = testnet::Parameters::build()
         .with_activation_heights(ConfiguredActivationHeights {
             nu7: Some(expected_activation_height),
+            #[cfg(zcash_unstable = "zfuture")]
+            zfuture: Some(expected_activation_height),
             ..Default::default()
         })
         .expect("failed to set activation heights")

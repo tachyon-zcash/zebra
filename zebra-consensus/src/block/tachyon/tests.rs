@@ -13,8 +13,9 @@ use zcash_tachyon::{
     action, bundle, effect,
     entropy::ActionEntropy,
     keys::private,
-    note::{CommitmentTrapdoor, Note, NullifierTrapdoor},
-    value, Anchor, Bundle, PointerStamp, ProofStamp, Tachygram, TachyonBundle,
+    note::{CommitmentTrapdoor, Note},
+    nullifier, value, Anchor, Bundle, PointerStamp, ProofStamp, Tachygram, TachygramSetPoly,
+    TachyonBundle,
 };
 
 use crate::error::BlockError;
@@ -57,7 +58,7 @@ fn dummy_action() -> zcash_tachyon::Action {
     let note = Note {
         pk: sk.derive_payment_key(),
         value: value::Positive::try_from(100u64).expect("valid value"),
-        psi: NullifierTrapdoor::random(&mut rng),
+        psi: nullifier::Trapdoor::random(&mut rng),
         rcm: CommitmentTrapdoor::random(&mut rng),
     };
     let alpha = ActionEntropy::random(&mut rng).randomizer::<effect::Output>(note.commitment());
@@ -81,12 +82,15 @@ fn proven_bundle(
     tachygrams: Vec<Tachygram>,
     coverage: [u8; 32],
 ) -> Bundle<ProofStamp> {
+    let tachygram_set = tachygrams.iter().copied().collect::<TachygramSetPoly>();
     Bundle {
         actions,
         value_balance: value::Balance::ZERO,
         binding_sig: bundle::Signature::read(&[0x02u8; 64][..]).expect("64 bytes"),
+        memo: Vec::new(),
         stamp: ProofStamp {
             coverage,
+            tachygram_set: tachygram_set.commit(),
             tachygrams: tachygrams.into_iter().collect(),
             anchor: zero_anchor(),
             proof: Box::new(ragu::Proof::trivial()),
@@ -100,6 +104,7 @@ fn adjunct_bundle(actions: Vec<zcash_tachyon::Action>, target: [u8; 64]) -> Bund
         actions,
         value_balance: value::Balance::ZERO,
         binding_sig: bundle::Signature::read(&[0x02u8; 64][..]).expect("64 bytes"),
+        memo: Vec::new(),
         stamp: PointerStamp::try_from(target).expect("nonzero wtxid"),
     }
 }
@@ -107,7 +112,7 @@ fn adjunct_bundle(actions: Vec<zcash_tachyon::Action>, target: [u8; 64]) -> Bund
 /// A V7 transaction carrying only the given tachyon bundle.
 fn v7_transaction(tachyon_bundle: TachyonBundle) -> Arc<Transaction> {
     Arc::new(Transaction::V7 {
-        network_upgrade: NetworkUpgrade::Nu7,
+        network_upgrade: NetworkUpgrade::ZFuture,
         lock_time: LockTime::min_lock_time_timestamp(),
         expiry_height: Height(0),
         inputs: Vec::new(),
@@ -237,9 +242,10 @@ fn aggregate_with_adjunct_passes_coherence() {
 
     let covered_digest =
         action_descriptor_digest(&[own_action.descriptor(), adjunct_action.descriptor()]);
+    // Two tachygrams per covered action (the aggregate's own and the adjunct's).
     let aggregate_tx = v7_transaction(TachyonBundle::Proven(proven_bundle(
         vec![own_action],
-        vec![tachygram(1)],
+        vec![tachygram(1), tachygram(2), tachygram(3), tachygram(4)],
         covered_digest,
     )));
 
@@ -289,7 +295,7 @@ fn autonome_passes_coherence() {
 
     let block = block_with(vec![v7_transaction(TachyonBundle::Proven(proven_bundle(
         vec![action],
-        vec![tachygram(7)],
+        vec![tachygram(7), tachygram(8)],
         digest,
     )))]);
 
@@ -329,7 +335,7 @@ async fn real_mock_proof_passes_verification() {
     let note = Note {
         pk: sk.derive_payment_key(),
         value: value::Positive::try_from(100u64).expect("valid value"),
-        psi: NullifierTrapdoor::random(&mut rng),
+        psi: nullifier::Trapdoor::random(&mut rng),
         rcm: CommitmentTrapdoor::random(&mut rng),
     };
     let theta = ActionEntropy::random(&mut rng);

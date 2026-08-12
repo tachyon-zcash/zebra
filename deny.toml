@@ -232,11 +232,12 @@ allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 # List of URLs for allowed Git repositories
 # TODO: Remove the URLs once the patch table in Cargo.toml is removed.
 allow-git = [
-    # tachyon fork dependencies, pinned via the [patch] table in the root Cargo.toml
-    "https://github.com/s1nus/ragu",
-    "https://github.com/s1nus/tachyon",
+    # tachyon fork dependencies, declared in the root Cargo.toml's
+    # [workspace.dependencies] (orchard via its [patch.crates-io] table)
     "https://github.com/tachyon-zcash/librustzcash",
     "https://github.com/tachyon-zcash/maybe-rayon.git",
+    "https://github.com/tachyon-zcash/ragu",
+    "https://github.com/tachyon-zcash/tachyon",
     "https://github.com/zcash/orchard.git",
 ]
 

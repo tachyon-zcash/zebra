@@ -68,6 +68,9 @@ pub enum NetworkUpgrade {
     #[serde(rename = "NU7")]
     Nu7,
 
+    /// The Zcash protocol after the unscheduled ZFuture upgrade: the staging
+    /// ground for in-development consensus changes. On this fork, Tachyon
+    /// (v7 transactions) activates at ZFuture.
     #[cfg(zcash_unstable = "zfuture")]
     ZFuture,
 }

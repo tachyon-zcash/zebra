@@ -1,4 +1,4 @@
-//! Block-level tachyon consensus rules (NU7, experimental).
+//! Block-level tachyon consensus rules (ZFuture, experimental).
 //!
 //! The tachyon bundle spec mandates four block-validity rules, applied in order:
 //!
@@ -136,6 +136,9 @@ pub(crate) fn coherence(block: &Block) -> Result<Vec<AggregateCoverage>, BlockEr
             .map_err(|err| match err {
                 VerifyCoverageError::DuplicateActions => BlockError::TachyonDuplicateAction,
                 VerifyCoverageError::StampActionsMismatch => BlockError::TachyonCoverageMismatch,
+                VerifyCoverageError::TachygramArityMismatch => {
+                    BlockError::TachyonTachygramArityMismatch
+                }
             })?;
     }
 

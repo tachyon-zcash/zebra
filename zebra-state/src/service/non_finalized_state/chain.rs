@@ -214,11 +214,11 @@ pub struct ChainInner {
     pub(crate) ironwood_subtrees:
         BTreeMap<NoteCommitmentSubtreeIndex, NoteCommitmentSubtreeData<orchard::tree::Node>>,
 
-    /// The Tachyon pool anchors created by `blocks`, and the heights that created them (NU7).
+    /// The Tachyon pool anchors created by `blocks`, and the heights that created them (ZFuture).
     ///
     /// Tachyon has no note commitment tree: its pool state is a running anchor, so the anchor
-    /// plays both the tree and root role. Only NU7-onward anchors are tracked; the maps stay
-    /// empty before NU7 activation.
+    /// plays both the tree and root role. Only ZFuture-onward anchors are tracked; the maps stay
+    /// empty before ZFuture activation.
     ///
     /// The height is needed because a proof stamp's anchor must come from a block within the
     /// two-epoch scan window (see [`tachyon::within_scan_window`]).
@@ -226,9 +226,9 @@ pub struct ChainInner {
     /// When a chain is forked from a finalized tip with an active Tachyon pool, also contains
     /// the finalized tip anchor.
     pub(crate) tachyon_anchors: HashMap<tachyon::Anchor, Vec<block::Height>>,
-    /// The Tachyon pool anchor after each block in `blocks` (NU7 onward).
+    /// The Tachyon pool anchor after each block in `blocks` (ZFuture onward).
     pub(crate) tachyon_anchors_by_height: BTreeMap<block::Height, tachyon::Anchor>,
-    /// The Tachyon epoch-boundary anchors created by `blocks`, by epoch index (NU7 onward).
+    /// The Tachyon epoch-boundary anchors created by `blocks`, by epoch index (ZFuture onward).
     ///
     /// An entry is added when an epoch-first block is committed to this chain: the anchor after
     /// that block's epoch lift, before any of its stamps (the epoch's initial state, which spend
@@ -239,7 +239,7 @@ pub struct ChainInner {
     /// are lifted to an end-of-block anchor before publication.
     pub(crate) tachyon_epoch_anchors_by_epoch: BTreeMap<u32, tachyon::Anchor>,
     /// The tachygrams revealed by proof stamps in `blocks`, and the heights that revealed them
-    /// (NU7 onward).
+    /// (ZFuture onward).
     ///
     /// Tachygrams are scanned over a two-epoch window: revealing a tachygram already revealed
     /// in the block's own epoch or the immediately preceding one is invalid (see
@@ -367,7 +367,7 @@ impl Chain {
         chain.add_history_tree(finalized_tip_height, history_tree);
 
         // Only seed a real Tachyon anchor: the default anchor means the pool has not
-        // started (pre-NU7 finalized tip), and only NU7-onward anchors are tracked.
+        // started (pre-ZFuture finalized tip), and only ZFuture-onward anchors are tracked.
         if finalized_tip_tachyon_anchor != tachyon::Anchor::default() {
             chain.add_tachyon_anchor(finalized_tip_height, finalized_tip_tachyon_anchor);
         }
@@ -1380,7 +1380,7 @@ impl Chain {
     /// Returns the Tachyon pool anchor after the block at `hash_or_height`, if the Tachyon
     /// pool has started by then in this [`Chain`].
     ///
-    /// Returns the default (pre-pool) anchor for heights before NU7 activation, matching the
+    /// Returns the default (pre-pool) anchor for heights before ZFuture activation, matching the
     /// seed of the anchor fold.
     pub fn tachyon_anchor(&self, hash_or_height: HashOrHeight) -> Option<tachyon::Anchor> {
         let height =
@@ -1426,7 +1426,7 @@ impl Chain {
     /// - a root block: all anchors at or below that height are removed, including temporary
     ///   finalized tip anchors.
     ///
-    /// Does nothing for heights without a tracked anchor (blocks before NU7 activation).
+    /// Does nothing for heights without a tracked anchor (blocks before ZFuture activation).
     fn remove_tachyon_anchor(&mut self, position: RevertPosition, height: Height) {
         trace!(?height, ?position, "removing tachyon anchor");
 
@@ -1497,7 +1497,7 @@ impl Chain {
     }
 
     /// Removes the Tachyon epoch-boundary anchor created by the block at `height`, if that
-    /// block is epoch-first. Does nothing for mid-epoch or pre-NU7 heights.
+    /// block is epoch-first. Does nothing for mid-epoch or pre-ZFuture heights.
     fn remove_tachyon_epoch_anchor(&mut self, position: RevertPosition, height: Height) {
         let Some(pool_height) = tachyon::pool_height(&self.network, height) else {
             return;
@@ -2035,7 +2035,7 @@ impl Chain {
         // Advance the Tachyon pool anchor with this block, if the pool has started.
         // `nct.tachyon_anchor` still holds the parent block's anchor here.
         //
-        // In builds without tachyon support V7 transactions cannot be parsed, so an NU7
+        // In builds without tachyon support V7 transactions cannot be parsed, so a ZFuture
         // chain cannot be synced and the anchor legitimately stays at its default.
         if let Some(pool_height) = zebra_chain::tachyon::pool_height(&self.network, height) {
             let advance = nct
@@ -3083,9 +3083,9 @@ mod tachyon_tests {
 
     use super::*;
 
-    /// A chain on a regtest network with NU7 activated at height 10, forked from a
-    /// finalized tip at height 9 (so pool height 0 is chain height 10).
-    fn nu7_chain() -> Chain {
+    /// A chain on a regtest network with ZFuture (tachyon) activated at height 10, forked
+    /// from a finalized tip at height 9 (so pool height 0 is chain height 10).
+    fn zfuture_chain() -> Chain {
         let network = Network::new_regtest(
             ConfiguredActivationHeights {
                 canopy: Some(1),
@@ -3094,7 +3094,8 @@ mod tachyon_tests {
                 nu6_1: Some(4),
                 nu6_2: Some(5),
                 nu6_3: Some(6),
-                nu7: Some(10),
+                nu7: Some(8),
+                zfuture: Some(10),
                 ..Default::default()
             }
             .into(),
@@ -3113,15 +3114,15 @@ mod tachyon_tests {
         tachyon::Tachygram([byte; 32])
     }
 
-    /// The height of the first block of `epoch` on the [`nu7_chain`] network
-    /// (NU7 activates at chain height 10).
+    /// The height of the first block of `epoch` on the [`zfuture_chain`] network
+    /// (ZFuture activates at chain height 10).
     fn epoch_first_height(epoch: u32) -> Height {
         Height(10 + epoch * tachyon::EPOCH_LENGTH)
     }
 
     #[test]
     fn same_epoch_duplicate_tachygram_is_rejected() {
-        let mut chain = nu7_chain();
+        let mut chain = zfuture_chain();
 
         chain
             .add_tachyon_tachygrams(Height(20), vec![tachygram(1), tachygram(2)])
@@ -3142,7 +3143,7 @@ mod tachyon_tests {
 
     #[test]
     fn duplicate_tachygram_scan_window_spans_two_epochs() {
-        let mut chain = nu7_chain();
+        let mut chain = zfuture_chain();
 
         // Epoch 0 (chain heights 10..10+EPOCH_LENGTH).
         chain
@@ -3173,7 +3174,7 @@ mod tachyon_tests {
 
     #[test]
     fn reverting_a_block_restores_its_tachygrams() {
-        let mut chain = nu7_chain();
+        let mut chain = zfuture_chain();
 
         chain
             .add_tachyon_tachygrams(Height(20), vec![tachygram(1)])
@@ -3196,7 +3197,7 @@ mod tachyon_tests {
 
     #[test]
     fn epoch_anchors_are_tracked_and_reverted() {
-        let mut chain = nu7_chain();
+        let mut chain = zfuture_chain();
         let anchor_0 = tachyon::Anchor([10; 32]);
         let anchor_1 = tachyon::Anchor([11; 32]);
 

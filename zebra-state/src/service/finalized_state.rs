@@ -105,8 +105,8 @@ pub const STATE_COLUMN_FAMILIES_IN_CODE: &[&str] = &[
     "ironwood_anchors",
     "ironwood_note_commitment_tree",
     "ironwood_note_commitment_subtree",
-    // Tachyon (NU7, experimental). Always registered so the database format is stable
-    // across build flags; these stay empty until the Tachyon pool starts at NU7.
+    // Tachyon (ZFuture, experimental). Always registered so the database format is stable
+    // across build flags; these stay empty until the Tachyon pool starts at ZFuture.
     // Tachyon has no note commitment tree: its pool state is a running anchor, stored
     // by height (for the tip anchor and reorgs) and by anchor (for membership checks).
     // Tachygrams are epoch-scoped: `tachyon_tachygrams` holds the current epoch's

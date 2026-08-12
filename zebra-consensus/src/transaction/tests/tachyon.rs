@@ -16,8 +16,8 @@ use zcash_tachyon::{
     action, bundle, effect,
     entropy::ActionEntropy,
     keys::private,
-    note::{CommitmentTrapdoor, Note, NullifierTrapdoor},
-    value, PointerStamp, ProofStamp, Tachygram, TachyonBundle,
+    note::{CommitmentTrapdoor, Note},
+    nullifier, value, PointerStamp, ProofStamp, Tachygram, TachygramSetPoly, TachyonBundle,
 };
 
 use crate::{
@@ -25,8 +25,8 @@ use crate::{
     transaction::{BlockRequest, BlockResponse, BlockTxVerifier},
 };
 
-/// A regtest network with NU7 scheduled, and NU7's activation height.
-fn nu7_network() -> (Network, Height) {
+/// A regtest network with ZFuture (tachyon) scheduled, and ZFuture's activation height.
+fn zfuture_network() -> (Network, Height) {
     let network = Network::new_regtest(
         ConfiguredActivationHeights {
             canopy: Some(1),
@@ -35,14 +35,15 @@ fn nu7_network() -> (Network, Height) {
             nu6_1: Some(4),
             nu6_2: Some(5),
             nu6_3: Some(6),
-            nu7: Some(10),
+            nu7: Some(8),
+            zfuture: Some(10),
             ..Default::default()
         }
         .into(),
     );
-    let height = NetworkUpgrade::Nu7
+    let height = NetworkUpgrade::ZFuture
         .activation_height(&network)
-        .expect("NU7 activation height is configured");
+        .expect("ZFuture activation height is configured");
     (network, height)
 }
 
@@ -67,8 +68,10 @@ fn v7_transaction(
 /// A proof stamp with an unasserted covered-actions digest and no proof: tx-level verification
 /// never checks the stamp's proof or coverage (those are block-level rules).
 fn mock_proof_stamp(tachygrams: Vec<Tachygram>) -> ProofStamp {
+    let tachygram_set = tachygrams.iter().copied().collect::<TachygramSetPoly>();
     ProofStamp {
         coverage: [0u8; 32],
+        tachygram_set: tachygram_set.commit(),
         tachygrams: tachygrams.into_iter().collect(),
         anchor: zcash_tachyon::Anchor::read(&[0u8; 64][..]).expect("zero anchor reads"),
         proof: Box::new(ragu::Proof::trivial()),
@@ -84,7 +87,7 @@ fn random_note(
     let note = Note {
         pk: sk.derive_payment_key(),
         value: value::Positive::try_from(value).expect("value is positive and below MAX_MONEY"),
-        psi: NullifierTrapdoor::random(rng),
+        psi: nullifier::Trapdoor::random(rng),
         rcm: CommitmentTrapdoor::random(rng),
     };
     (sk, note)
@@ -125,7 +128,7 @@ fn signed_spend_bundle(value: u64) -> zcash_tachyon::Bundle<zcash_tachyon::Unpro
         .sign(&mut rng, &[0u8; 32], &ask)
         .expect("bundle plan has matching signatures and an in-range value balance");
     let draft_tx = v7_transaction(
-        NetworkUpgrade::Nu7,
+        NetworkUpgrade::ZFuture,
         Some(TachyonBundle::Proven(draft.stamp(mock_proof_stamp(vec![])))),
     );
     let sighash = v7_sighash(&draft_tx);
@@ -141,7 +144,7 @@ fn signed_spend_bundle(value: u64) -> zcash_tachyon::Bundle<zcash_tachyon::Unpro
 /// the same sighash as its properly-signed counterpart under any stamp.
 fn v7_sighash(tx: &Transaction) -> [u8; 32] {
     tx.sighash(
-        NetworkUpgrade::Nu7,
+        NetworkUpgrade::ZFuture,
         HashType::ALL,
         Arc::new(Vec::new()),
         None,
@@ -183,15 +186,15 @@ async fn v7_sighash_commits_to_tachyon_bundle() {
         .sign(&mut rng, &[0u8; 32], &ask)
         .expect("bundle plan has matching signatures and an in-range value balance");
 
-    let no_bundle_sighash = v7_sighash(&v7_transaction(NetworkUpgrade::Nu7, None));
+    let no_bundle_sighash = v7_sighash(&v7_transaction(NetworkUpgrade::ZFuture, None));
     let proven_sighash = v7_sighash(&v7_transaction(
-        NetworkUpgrade::Nu7,
+        NetworkUpgrade::ZFuture,
         Some(TachyonBundle::Proven(
             bundle.clone().stamp(mock_proof_stamp(vec![])),
         )),
     ));
     let adjunct_sighash = v7_sighash(&v7_transaction(
-        NetworkUpgrade::Nu7,
+        NetworkUpgrade::ZFuture,
         Some(TachyonBundle::Adjunct(
             bundle
                 .stamp(mock_proof_stamp(vec![]))
@@ -199,7 +202,7 @@ async fn v7_sighash_commits_to_tachyon_bundle() {
         )),
     ));
     let other_bundle_sighash = v7_sighash(&v7_transaction(
-        NetworkUpgrade::Nu7,
+        NetworkUpgrade::ZFuture,
         Some(TachyonBundle::Proven(
             signed_spend_bundle(100).stamp(mock_proof_stamp(vec![])),
         )),
@@ -218,11 +221,11 @@ async fn v7_sighash_commits_to_tachyon_bundle() {
 #[tokio::test(flavor = "multi_thread")]
 async fn v7_with_signed_tachyon_bundle_is_accepted() {
     let _init_guard = zebra_test::init();
-    let (network, height) = nu7_network();
+    let (network, height) = zfuture_network();
 
     // Proof-stamped: the tx-level rules don't verify the proof itself.
     let proven = signed_spend_bundle(100).stamp(mock_proof_stamp(vec![]));
-    let tx = v7_transaction(NetworkUpgrade::Nu7, Some(TachyonBundle::Proven(proven)));
+    let tx = v7_transaction(NetworkUpgrade::ZFuture, Some(TachyonBundle::Proven(proven)));
     verify_block_transaction(&network, height, tx)
         .await
         .expect("a signed proof-stamped tachyon transaction should verify");
@@ -232,7 +235,10 @@ async fn v7_with_signed_tachyon_bundle_is_accepted() {
     let adjunct = signed_spend_bundle(100)
         .stamp(mock_proof_stamp(vec![]))
         .strip(PointerStamp::try_from([0xEEu8; 64]).expect("nonzero wtxid"));
-    let tx = v7_transaction(NetworkUpgrade::Nu7, Some(TachyonBundle::Adjunct(adjunct)));
+    let tx = v7_transaction(
+        NetworkUpgrade::ZFuture,
+        Some(TachyonBundle::Adjunct(adjunct)),
+    );
     verify_block_transaction(&network, height, tx)
         .await
         .expect("a signed pointer-stamped tachyon transaction should verify");
@@ -242,7 +248,7 @@ async fn v7_with_signed_tachyon_bundle_is_accepted() {
 #[tokio::test(flavor = "multi_thread")]
 async fn v7_with_wrong_sighash_signatures_is_rejected() {
     let _init_guard = zebra_test::init();
-    let (network, height) = nu7_network();
+    let (network, height) = zfuture_network();
 
     // Sign over a different message than the transaction's sighash.
     let mut rng = rand::thread_rng();
@@ -251,7 +257,7 @@ async fn v7_with_wrong_sighash_signatures_is_rejected() {
         .sign(&mut rng, &[0x42u8; 32], &ask)
         .expect("bundle plan has matching signatures and an in-range value balance")
         .stamp(mock_proof_stamp(vec![]));
-    let tx = v7_transaction(NetworkUpgrade::Nu7, Some(TachyonBundle::Proven(bundle)));
+    let tx = v7_transaction(NetworkUpgrade::ZFuture, Some(TachyonBundle::Proven(bundle)));
 
     let result = verify_block_transaction(&network, height, tx).await;
     assert!(
@@ -266,7 +272,7 @@ async fn v7_with_identity_cv_is_rejected() {
     use halo2::pasta::group::prime::PrimeCurveAffine;
 
     let _init_guard = zebra_test::init();
-    let (network, height) = nu7_network();
+    let (network, height) = zfuture_network();
 
     let mut rng = rand::thread_rng();
 
@@ -287,9 +293,10 @@ async fn v7_with_identity_cv_is_rejected() {
         actions: vec![action],
         value_balance: value::Balance::ZERO,
         binding_sig: bundle::Signature::read(&[0x02u8; 64][..]).expect("64 bytes"),
+        memo: Vec::new(),
         stamp: mock_proof_stamp(vec![]),
     };
-    let tx = v7_transaction(NetworkUpgrade::Nu7, Some(TachyonBundle::Proven(bundle)));
+    let tx = v7_transaction(NetworkUpgrade::ZFuture, Some(TachyonBundle::Proven(bundle)));
 
     let result = verify_block_transaction(&network, height, tx).await;
     assert!(
@@ -303,15 +310,16 @@ async fn v7_with_identity_cv_is_rejected() {
 // unsorted entries. A duplicate-tachygram transaction is unrepresentable in Zebra, so there
 // is no transaction-level semantic check (or test) for it.
 
-/// V7 transactions are rejected before NU7 activation.
+/// V7 transactions are rejected before ZFuture activation, including under NU7
+/// itself (the upstream v6-transaction upgrade).
 #[tokio::test(flavor = "multi_thread")]
-async fn v7_is_rejected_before_nu7() {
+async fn v7_is_rejected_before_zfuture() {
     let _init_guard = zebra_test::init();
-    let (network, _) = nu7_network();
+    let (network, _) = zfuture_network();
 
-    let nu6_3_height = NetworkUpgrade::Nu6_3
+    let nu7_height = NetworkUpgrade::Nu7
         .activation_height(&network)
-        .expect("NU6.3 activation height is configured");
+        .expect("NU7 activation height is configured");
 
     // The bundle's actions let the transaction pass the has-inputs-and-outputs check, so the
     // network-upgrade gate is what rejects it. The gate errors before any signature check runs,
@@ -322,9 +330,9 @@ async fn v7_is_rejected_before_nu7() {
         .sign(&mut rng, &[0u8; 32], &ask)
         .expect("bundle plan has matching signatures and an in-range value balance")
         .stamp(mock_proof_stamp(vec![]));
-    let tx = v7_transaction(NetworkUpgrade::Nu6_3, Some(TachyonBundle::Proven(bundle)));
+    let tx = v7_transaction(NetworkUpgrade::Nu7, Some(TachyonBundle::Proven(bundle)));
 
-    let result = verify_block_transaction(&network, nu6_3_height, tx).await;
+    let result = verify_block_transaction(&network, nu7_height, tx).await;
     assert!(
         matches!(
             result,

@@ -1240,7 +1240,7 @@ mod v7_tests {
     lazy_static! {
         /// An empty V7 transaction with no bundles at all.
         pub static ref EMPTY_V7_TX: Transaction = Transaction::V7 {
-            network_upgrade: NetworkUpgrade::Nu7,
+            network_upgrade: NetworkUpgrade::ZFuture,
             lock_time: LockTime::min_lock_time_timestamp(),
             expiry_height: block::Height(0),
             inputs: Vec::new(),
@@ -1263,10 +1263,11 @@ mod v7_tests {
                 actions: vec![action],
                 value_balance: zcash_tachyon::value::Balance::ZERO,
                 binding_sig: zcash_tachyon::bundle::Signature::read(&[0x02u8; 64][..]).unwrap(),
+                memo: Vec::new(),
                 stamp: adjunct_with_wtxid([0xEEu8; 64]),
             });
             Transaction::V7 {
-                network_upgrade: NetworkUpgrade::Nu7,
+                network_upgrade: NetworkUpgrade::ZFuture,
                 lock_time: LockTime::min_lock_time_timestamp(),
                 expiry_height: block::Height(0),
                     inputs: Vec::new(),
@@ -1291,17 +1292,22 @@ mod v7_tests {
                 actions: vec![action],
                 value_balance: zcash_tachyon::value::Balance::try_from(100i64).unwrap(),
                 binding_sig: zcash_tachyon::bundle::Signature::read(&[0x02u8; 64][..]).unwrap(),
+                memo: Vec::new(),
                 stamp: zcash_tachyon::ProofStamp {
                     // Covered-actions digest is not asserted by fixture consumers;
                     // it only needs to round-trip through the wire format.
                     coverage: [0u8; 32],
+                    tachygram_set: [tachygram]
+                        .into_iter()
+                        .collect::<zcash_tachyon::TachygramSetPoly>()
+                        .commit(),
                     tachygrams: [tachygram].into_iter().collect(),
                     anchor: default_anchor(),
                     proof: Box::new(ragu::Proof::trivial()),
                 },
             });
             Transaction::V7 {
-                network_upgrade: NetworkUpgrade::Nu7,
+                network_upgrade: NetworkUpgrade::ZFuture,
                 lock_time: LockTime::min_lock_time_timestamp(),
                 expiry_height: block::Height(0),
                     inputs: Vec::new(),
@@ -1336,17 +1342,22 @@ mod v7_tests {
                 actions: vec![action1, action2],
                 value_balance: zcash_tachyon::value::Balance::try_from(300i64).unwrap(),
                 binding_sig: zcash_tachyon::bundle::Signature::read(&[0x02u8; 64][..]).unwrap(),
+                memo: Vec::new(),
                 stamp: zcash_tachyon::ProofStamp {
                     // Covered-actions digest is not asserted by fixture consumers;
                     // it only needs to round-trip through the wire format.
                     coverage: [0u8; 32],
+                    tachygram_set: [tg1, tg2, tg3]
+                        .into_iter()
+                        .collect::<zcash_tachyon::TachygramSetPoly>()
+                        .commit(),
                     tachygrams: [tg1, tg2, tg3].into_iter().collect(),
                     anchor: default_anchor(),
                     proof: Box::new(ragu::Proof::trivial()),
                 },
             });
             Transaction::V7 {
-                network_upgrade: NetworkUpgrade::Nu7,
+                network_upgrade: NetworkUpgrade::ZFuture,
                 lock_time: LockTime::min_lock_time_timestamp(),
                 expiry_height: block::Height(0),
                 inputs: Vec::new(),
@@ -1422,12 +1433,12 @@ mod v7_tests {
             (
                 "EMPTY_V7_TX",
                 &EMPTY_V7_TX,
-                "0700008068636174d80a19770065cd1d0000000000000000000000",
+                "0700008068636174fdffffff0065cd1d0000000000000000000000",
             ),
             (
                 "V7_TX_TACHYON_STRIPPED",
                 &V7_TX_TACHYON_STRIPPED,
-                "0700008068636174d80a19770065cd1d000000000000000000000200000000000000000100000000ed302d991bf94c09fc98462200000000000000000000000000000040ba6454c4a1d42730b53cbf30d05d3f95aa541c98eba0205a75bb7983443b37310101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010102020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "0700008068636174fdffffff0065cd1d000000000000000000000200000000000000000100000000ed302d991bf94c09fc98462200000000000000000000000000000040ba6454c4a1d42730b53cbf30d05d3f95aa541c98eba0205a75bb7983443b3731010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020200eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             ),
         ];
 

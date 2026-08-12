@@ -135,7 +135,7 @@ jobs:
         env:
           # Setting RUSTFLAGS replaces the workspace `.cargo/config.toml` build
           # rustflags, so the NU7 cfg must be repeated here.
-          RUSTFLAGS: -D warnings --cfg zcash_unstable="nu7"
+          RUSTFLAGS: -D warnings --cfg zcash_unstable="nu7" --cfg zcash_unstable="zfuture"
 
   unused-deps:
     name: Nightly unused dependencies

@@ -915,10 +915,12 @@ impl Arbitrary for Transaction {
             ]
             .boxed(),
 
+            // V6 transactions stay valid alongside v4 and v5 under ZFuture.
             #[cfg(zcash_unstable = "zfuture")]
             NetworkUpgrade::ZFuture => prop_oneof![
                 Self::v4_strategy(ledger_state.clone()),
-                Self::v5_strategy(ledger_state)
+                Self::v5_strategy(ledger_state.clone()),
+                Self::v6_strategy(ledger_state)
             ]
             .boxed(),
         }

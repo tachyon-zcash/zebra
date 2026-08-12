@@ -75,7 +75,7 @@ jobs:
           # Keep build-host paths out of the binary. Setting RUSTFLAGS replaces the
           # workspace `.cargo/config.toml` build rustflags, so the NU7 cfg must be
           # repeated here.
-          export RUSTFLAGS="--remap-path-prefix=${GITHUB_WORKSPACE}=/zebra --remap-path-prefix=${HOME}/.cargo=/cargo --cfg zcash_unstable=\"nu7\""
+          export RUSTFLAGS="--remap-path-prefix=${GITHUB_WORKSPACE}=/zebra --remap-path-prefix=${HOME}/.cargo=/cargo --cfg zcash_unstable=\"nu7\" --cfg zcash_unstable=\"zfuture\""
           export CARGO_PROFILE_RELEASE_STRIP=symbols
           # ROCKSDB_LIB_DIR is left unset so librocksdb-sys builds and links RocksDB
           # statically; the binary then depends only on glibc and libstdc++.

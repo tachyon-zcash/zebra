@@ -235,7 +235,7 @@ impl Block {
     }
 
     /// Count how many Tachyon transactions exist in a block,
-    /// i.e. transactions carrying a tachyon bundle (NU7).
+    /// i.e. transactions carrying a tachyon bundle (ZFuture).
     pub fn tachyon_transactions_count(&self) -> u64 {
         self.transactions
             .iter()

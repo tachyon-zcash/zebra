@@ -17,7 +17,7 @@ env:
   # A RUSTFLAGS env var replaces both the setup-rust-toolchain action's default
   # (-D warnings) and the workspace `.cargo/config.toml` rustflags, so it must
   # carry the NU7 cfg itself.
-  RUSTFLAGS: -D warnings --cfg zcash_unstable="nu7"
+  RUSTFLAGS: -D warnings --cfg zcash_unstable="nu7" --cfg zcash_unstable="zfuture"
   BENCHES: |
     criterion -p zebra-consensus --bench groth16
     criterion -p zebra-consensus --bench halo2

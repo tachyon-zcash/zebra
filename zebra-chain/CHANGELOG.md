@@ -9,9 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
-- Added the `ValueBalanceError::Total` variant returned when the sum of value
-  pools is out of range
-  ([#10817](https://github.com/ZcashFoundation/zebra/pull/10817))
 - `primitives::zcash_history::BlockCommitmentTreeRoots` gains a `tachyon` field, and
   the new `V4` history-tree version extends `V3` node data with the Tachyon pool
   anchor and bundle count from NU7 onward, so chain history commits to the Tachyon
@@ -19,16 +16,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `ValueBalance::total`, which returns the sum of all value pool balances
 - The `tachyon` module: the Tachyon pool's running anchor (`Anchor`, `AnchorAdvance`,
   `Tachygram`), epoch helpers, and `within_scan_window`, the two-epoch consensus scan
   window for tachygram duplicates and proof-stamp anchor recency
   ([tachyon-zcash/zebra#63](https://github.com/tachyon-zcash/zebra/pull/63))
 - `Transaction::tachyon_tachygrams` and `Block::tachyon_transactions_count`
 
+### Changed
+
+- `zcash_tachyon` now tracks the tachyon-zcash `main` branch. The V7 tachyon
+  bundle wire format gains the bundle memo payload and the proof stamp's
+  carried tachygram-set commitment, and anchor steps are bound to the epoch of
+  the block, so `tachyon::Anchor::advance_with_block` produces different
+  anchors for the same blocks
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+- Tachyon moves from NU7 to the restored ZFuture network upgrade, following
+  librustzcash `main` (which now gates tachyon behind
+  `zcash_unstable = "zfuture"`). This fork always compiles with both the `nu7`
+  and `zfuture` cfgs: `NetworkUpgrade::ZFuture` (consensus branch id
+  `0xfffffffd`) activates the Tachyon pool (`tachyon::pool_height`), V7
+  transactions carry ZFuture and serialize its branch id, and the V4
+  (Tachyon-onward) history tree starts at ZFuture while NU7 reverts to the
+  Ironwood (V3) tree
+  ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
+
 ### Fixed
 
 - Comments in `zebra-chain/src/transaction/tests/vectors.rs`
+
+## [12.0.0] - 2026-08-10
+
+### Breaking Changes
+
+- Added the `ValueBalanceError::Total` variant returned when the sum of value
+  pools is out of range
+  ([#10817](https://github.com/ZcashFoundation/zebra/pull/10817)).
+
+### Added
+
+- `ValueBalance::total`, which returns the sum of all value pool balances
+  ([#10817](https://github.com/ZcashFoundation/zebra/pull/10817)).
 
 ## [11.3.0] - 2026-07-27
 

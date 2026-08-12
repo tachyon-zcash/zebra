@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 3fc97c747fa976f3da153c069c950c33036f4d737454d6f22f508052541e7514 # shrinks to network = Mainnet, transaction = VerifiedUnminedTx("private")
+cc 3703114bf027335c027b3a0e87e70a21d8803da793e18fd1c8d978d660066e3a # shrinks to network = Mainnet, transaction = VerifiedUnminedTx("private"), chain_tip = ChainTipBlock { height: Height(20713769), hash: block::Hash("64b9b87436927dff4c4ff07b2571c514fe2ea04500c778669b3bdc8fd242f745"), transactions: 36 }
+cc d3e3283c234a4abe37c0a962210b0930dc6810aaa5e56fa1d73190a1c7dabf06 # shrinks to network = Mainnet, mut previous_chain_tip = ChainTipBlock { height: Height(888495557), hash: block::Hash("57d737e179d64b8cd0bfc254073134e4fb03c494c26700c9a5c9a40400000000"), transactions: 78 }, mut transactions = [], fake_chain_tips = []

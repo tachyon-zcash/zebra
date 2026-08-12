@@ -33,18 +33,11 @@ edition = "2021"
 [workspace.dependencies]
 incrementalmerkletree = { version = "0.8.2", features = ["legacy-api"] }
 orchard = "0.15.0"
-# The `cnode-working` branches below are identical to their upstream `main`
-# branches, but with certain PRs merged that are not yet in upstream.
-# See the diffs against the tachyon-zcash `main` branches here:
-#   zcash_tachyon: https://github.com/tachyon-zcash/tachyon/compare/main...s1nus:tachyon:cnode-working
-#   ragu:          https://github.com/tachyon-zcash/ragu/compare/main...s1nus:ragu:cnode-working
-# zcash_tachyon is pinned to an exact rev because cargo-semver-checks builds
-# rustdoc in a scratch workspace that re-resolves branch deps to their HEAD,
-# and cnode-working HEAD now carries an Anchor API (EpochIndex arguments) that
-# is incompatible with this tree's call sites. A follow-up dep PR moves to
-# tachyon-zcash/tachyon `main` and updates the call sites.
-zcash_tachyon = {git = "https://github.com/s1nus/tachyon", rev = "c3cff76fd59355511ca34a6dc0d707bdcc3f5ea4"}
-ragu = {git = "https://github.com/s1nus/ragu", branch = "cnode-working", default-features = false, features = ["mock"]}
+# zcash_tachyon tracks tachyon-zcash `main`, matching the declaration on
+# librustzcash `main` so both edges resolve to a single copy. ragu must be the
+# exact rev zcash_tachyon's manifest pins, again so only one copy exists.
+zcash_tachyon = {git = "https://github.com/tachyon-zcash/tachyon", branch = "main"}
+ragu = {git = "https://github.com/tachyon-zcash/ragu", rev = "284882da60128b03ca210b32793c17aea5103a8e", default-features = false, features = ["mock"]}
 sapling-crypto = "0.7"
 # librustzcash crates track the tachyon-zcash fork's `main` branch. See its diff
 # against upstream zcash/librustzcash `main` here:
