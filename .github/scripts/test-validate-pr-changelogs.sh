@@ -123,11 +123,14 @@ fragment zebrad-added.yaml zebrad Added
 commit_fixture wrong-project
 expect_failure "fragment for another project" true feat false
 
-# A breaking title needs a breaking fragment for the changed package.
+# tachyon fork: a breaking title only needs a (non-breaking) fragment for the
+# changed package; upstream additionally demanded a breaking fragment, but that
+# forces sync PRs to fabricate breaks for packages upstream declares
+# non-breaking. The title/fragment consistency check below still applies.
 write_file zebra-example/src/lib.rs '// Breaking change.'
 fragment zebra-example-added-2.yaml zebra-example Added
 commit_fixture breaking-title-without-breaking-fragment
-expect_failure "breaking title with a non-breaking fragment" true feat true
+expect_success "breaking title with a non-breaking fragment" true feat true
 
 write_file zebra-example/src/lib.rs '// Breaking change, declared.'
 fragment zebra-example-breaking.yaml zebra-example breaking
