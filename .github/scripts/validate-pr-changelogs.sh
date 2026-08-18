@@ -206,11 +206,12 @@ while IFS=$'\t' read -r package_name package_directory; do
     failed=true
   fi
 
-  if [[ "$breaking" == "true" ]] && ! has_breaking_fragment_for_project "$package_name"; then
-    printf 'Missing breaking change fragment for package %s\n' "$package_name" >&2
-    echo "::error title=Missing package breaking change fragment::A breaking PR needs a '${breaking_kind}' fragment for each directly changed publishable package: run 'changie new -j ${package_name} -k ${breaking_kind}'." >&2
-    failed=true
-  fi
+  # tachyon fork: the per-package breaking-fragment requirement from upstream is
+  # dropped here. A sync PR that carries an upstream 'breaking' fragment must be
+  # titled breaking, and would otherwise need a 'breaking' fragment for every
+  # touched package — including packages upstream itself declares non-breaking,
+  # which would fabricate breaks into the release notes. The title/fragment
+  # consistency check above and the per-package change-fragment requirement stay.
 done <<< "$package_metadata"
 
 root_manifest_changed=false

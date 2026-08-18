@@ -1,0 +1,4 @@
+project: zebra-state
+kind: Changed
+body: 'Merged upstream Zebra main: the state service gains an `AwaitUtxo` request variant (with the `AwaitUtxoRequest` mapped-request helper) for awaiting a transparent UTXO by outpoint, alongside internal pending-UTXO and error-type updates ([tachyon-zcash/zebra#71](https://github.com/tachyon-zcash/zebra/pull/71)).'
+time: 2026-08-18T06:00:00.000000000Z
