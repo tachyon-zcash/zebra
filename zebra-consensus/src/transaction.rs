@@ -488,6 +488,10 @@ where
             // Do quick checks first
             check_common_consensus_rules(tx.as_ref(), height, &network)?;
 
+            // Aggregate and pointer-stamped bundles are miner-created block encodings. Relay only
+            // autonome transactions, whose proof stamp covers their own actions.
+            check::tachyon_bundle_is_autonome(tx.as_ref())?;
+
             tracing::trace!(?tx_id, "passed quick checks");
 
             // Mempool transactions are checked against the next median-time-past from state.

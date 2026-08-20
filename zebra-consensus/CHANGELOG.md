@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ### Changed
 
+- `transaction::MempoolTxVerifier` only accepts autonome Tachyon transactions. Aggregate and
+  pointer-stamped bundles remain valid in blocks but are rejected by mempool policy.
 - V7 (tachyon) transactions are valid from the ZFuture network upgrade instead
   of NU7; a V7 transaction under NU7 is now rejected with
   `UnsupportedByNetworkUpgrade`. NU7 keeps the upstream v6-transaction rules

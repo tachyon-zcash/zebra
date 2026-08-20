@@ -56,7 +56,7 @@ pub use request::Spend;
 
 pub use response::{
     AnyTx, GetBlockTemplateChainInfo, KnownBlock, MinedTx, NonFinalizedBlocksListener,
-    ReadResponse, Response,
+    ReadResponse, Response, TachyonMiningData,
 };
 pub use service::{
     chain_tip::{ChainTipBlock, ChainTipChange, ChainTipSender, LatestChainTip, TipAction},

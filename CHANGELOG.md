@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org).
   earlier build activates at a different height and cannot be reused
   ([tachyon-zcash/zebra#68](https://github.com/tachyon-zcash/zebra/pull/68))
 
+### Added
+
+- V7 mining support filters selected Tachyon transactions against the exact candidate tip,
+  two-epoch anchor window, and revealed-tachygram set, then aggregates the safe autonome set
+  during block-template construction. The mempool rejects aggregate and pointer-stamped bundles,
+  leaving miners to lift and merge proof stamps and emit pointer-stamped adjuncts.
+
 ## [Zebra 6.3.0](https://github.com/ZcashFoundation/zebra/releases/tag/v6.3.0) - 2026-08-10
 
 ### Added

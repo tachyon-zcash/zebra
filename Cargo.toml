@@ -34,7 +34,7 @@ edition = "2021"
 incrementalmerkletree = { version = "0.8.2", features = ["legacy-api"] }
 orchard = "0.15.0"
 # zcash_tachyon tracks tachyon-zcash `main`, matching the declaration on
-# librustzcash `main` so both edges resolve to a single copy. ragu must be the
+# librustzcash `main` so both dependency edges resolve to a single copy. ragu must be the
 # exact rev zcash_tachyon's manifest pins, again so only one copy exists.
 zcash_tachyon = {git = "https://github.com/tachyon-zcash/tachyon", branch = "main"}
 ragu = {git = "https://github.com/tachyon-zcash/ragu", rev = "284882da60128b03ca210b32793c17aea5103a8e", default-features = false, features = ["mock"]}
