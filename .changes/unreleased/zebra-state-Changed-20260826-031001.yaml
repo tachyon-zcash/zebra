@@ -1,0 +1,4 @@
+project: zebra-state
+kind: Changed
+body: 'Tachyon anchor transition errors now reject blocks through contextual validation.'
+time: 2026-08-26T03:10:01.000000000Z

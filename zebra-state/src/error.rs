@@ -455,6 +455,9 @@ pub enum ValidateContextError {
     #[error("error updating a note commitment tree: {0}")]
     NoteCommitmentTreeError(#[from] zebra_chain::parallel::tree::NoteCommitmentTreeError),
 
+    #[error("error advancing the Tachyon anchor: {0}")]
+    TachyonAnchorError(#[source] Arc<zcash_tachyon::AnchorError>),
+
     #[error("error building the history tree: {0}")]
     HistoryTreeError(#[from] Arc<HistoryTreeError>),
 
@@ -536,6 +539,12 @@ pub enum ValidateContextError {
 impl From<sprout::tree::NoteCommitmentTreeError> for ValidateContextError {
     fn from(value: sprout::tree::NoteCommitmentTreeError) -> Self {
         ValidateContextError::NoteCommitmentTreeError(value.into())
+    }
+}
+
+impl From<zcash_tachyon::AnchorError> for ValidateContextError {
+    fn from(value: zcash_tachyon::AnchorError) -> Self {
+        ValidateContextError::TachyonAnchorError(Arc::new(value))
     }
 }
 
