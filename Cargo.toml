@@ -33,11 +33,9 @@ edition = "2021"
 [workspace.dependencies]
 incrementalmerkletree = { version = "0.8.2", features = ["legacy-api"] }
 orchard = "0.15.0"
-# zcash_tachyon tracks tachyon-zcash `main`, matching the declaration on
-# librustzcash `main` so both edges resolve to a single copy. ragu must be the
-# exact rev zcash_tachyon's manifest pins, again so only one copy exists.
+# Tachyon stack: track the `main` branches of the tachyon-zcash org repos.
 zcash_tachyon = {git = "https://github.com/tachyon-zcash/tachyon", branch = "main"}
-ragu = {git = "https://github.com/tachyon-zcash/ragu", rev = "284882da60128b03ca210b32793c17aea5103a8e", default-features = false, features = ["mock"]}
+ragu = {git = "https://github.com/tachyon-zcash/ragu", branch = "main", default-features = false, features = ["mock"]}
 sapling-crypto = "0.7"
 # librustzcash crates track the tachyon-zcash fork's `main` branch. See its diff
 # against upstream zcash/librustzcash `main` here:

@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ### Breaking Changes
 
+- `zcash_tachyon` now tracks the `main` branch of `tachyon-zcash/tachyon` (and
+  `ragu` the `main` branch of `tachyon-zcash/ragu`) instead of the
+  `s1nus/cnode-working` branches. The new tachyon `Anchor` API binds each
+  anchor link to its block's `EpochIndex`, and `VerifyCoverageError` gained a
+  `TachygramArityMismatch` variant, mapped to the new
+  `error::BlockError::TachyonTachygramArityMismatch`.
 - `error::BlockError::TachyonDuplicateTachygram` is replaced by
   `TachyonDuplicateAction`: block verification now rejects duplicate action
   descriptors across a proof stamp's own bundle and the pointer-stamped bundles
