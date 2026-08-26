@@ -1,4 +1,4 @@
 project: zebra-chain
 kind: breaking
-body: '`tachyon::Anchor::advance_with_block` now returns a `Result`, uses Tachyon''s genesis anchor for the first pool block, and leaves the anchor unchanged for stamp-less blocks.'
+body: '`tachyon::Anchor::advance_with_block` now returns a `Result`, uses Tachyon''s genesis anchor for the first pool block, and leaves the anchor unchanged for stamp-less blocks ([#73](https://github.com/tachyon-zcash/zebra/pull/73)).'
 time: 2026-08-26T03:10:00.000000000Z
