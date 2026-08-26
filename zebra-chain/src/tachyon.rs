@@ -2,9 +2,8 @@
 //!
 //! Tachyon has no note commitment tree. Its pool state is a running *anchor*: a
 //! Poseidon hash sequence that absorbs each proof stamp's tachygram-set
-//! commitment, ticks once through every stamp-less block, and lifts at epoch
-//! boundaries. The anchor takes the role that a note commitment tree root has
-//! for the Sapling, Orchard, and Ironwood pools.
+//! commitment and lifts at epoch boundaries. The anchor takes the role that a
+//! note commitment tree root has for the Sapling, Orchard, and Ironwood pools.
 
 use std::{fmt, io};
 
@@ -211,54 +210,59 @@ impl Anchor {
     /// the block's 0-based height above the ZFuture activation height, which
     /// drives the epoch schedule (see [`EPOCH_LENGTH`]).
     ///
-    /// This mirrors tachyon's reference pool fold: an epoch-first pool height
-    /// lifts the anchor into its epoch, then each proof stamp's tachygram-set
-    /// commitment is absorbed in transaction order, and a block with no proof
-    /// stamps ticks the anchor once instead (preserving per-height anchor
-    /// uniqueness). Adjunct (pointer-stamped) bundles do not contribute: their
-    /// tachygrams are carried by the aggregate's proof stamp.
+    /// This mirrors tachyon's reference pool fold: the first pool block starts
+    /// at the genesis anchor, later epoch-first pool heights lift the anchor
+    /// into their epoch, and each proof stamp's tachygram-set commitment is
+    /// absorbed in transaction order. Adjunct (pointer-stamped) bundles do not
+    /// contribute: their tachygrams are carried by the aggregate's proof stamp.
     ///
     /// The returned [`AnchorAdvance`] also carries the epoch-boundary anchor
     /// when `block` starts a new epoch: the epoch's initial state, which spend
     /// lineages root at, tracked in state per epoch.
-    pub fn advance_with_block(&self, pool_height: u32, block: &Block) -> AnchorAdvance {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an epoch or stamp would produce an invalid anchor
+    /// transition.
+    pub fn advance_with_block(
+        &self,
+        pool_height: u32,
+        block: &Block,
+    ) -> Result<AnchorAdvance, zcash_tachyon::AnchorError> {
         use zcash_tachyon::TachyonBundle;
 
         let epoch = zcash_tachyon::EpochIndex(epoch_of_pool_height(pool_height));
 
-        let mut anchor = self.to_tachyon();
-        let epoch_boundary = if is_epoch_first(pool_height) {
-            anchor = anchor.next_epoch(epoch);
+        let mut anchor = if pool_height == 0 {
+            zcash_tachyon::Anchor::default()
+        } else {
+            self.to_tachyon()
+        };
+        let epoch_boundary = if pool_height == 0 {
+            Some(Anchor::from(anchor))
+        } else if is_epoch_first(pool_height) {
+            anchor = anchor.next_epoch(epoch)?;
             Some(Anchor::from(anchor))
         } else {
             None
         };
 
-        let mut absorbed_stamp = false;
         for transaction in &block.transactions {
             let Some(shielded_data) = transaction.tachyon_shielded_data() else {
                 continue;
             };
             if let TachyonBundle::Proven(bundle) = &shielded_data.0 {
                 // The stamp carries its tachygram-set commitment; semantic
-                // verification confirms it against the tachygrams
-                // (`ProofStamp::is_accumulating`), so committed blocks can
-                // never reach the identity point that `next_stamp` panics on:
-                // the set polynomial is monic, so its commitment is never the
-                // identity.
-                anchor = anchor.next_stamp(epoch, &bundle.stamp.tachygram_set);
-                absorbed_stamp = true;
+                // verification confirms it against a valid, non-empty set of
+                // tachygrams (`ProofStamp::is_accumulating`).
+                anchor = anchor.next_stamp(epoch, &bundle.stamp.tachygram_set)?;
             }
         }
 
-        if !absorbed_stamp {
-            anchor = anchor.next_empty(epoch);
-        }
-
-        AnchorAdvance {
+        Ok(AnchorAdvance {
             post_block: Anchor::from(anchor),
             epoch_boundary,
-        }
+        })
     }
 }
 
@@ -313,16 +317,15 @@ mod tests {
                 .expect("block test vector is valid")
         }
 
-        /// The default (zero) anchor is the pre-pool fold seed: lifting it into
-        /// epoch 0 yields tachyon's genesis anchor.
+        /// The first pool block starts at tachyon's genesis anchor.
         #[test]
-        fn default_anchor_is_pre_pool_seed() {
-            assert_eq!(
-                Anchor::default()
-                    .to_tachyon()
-                    .next_epoch(zcash_tachyon::EpochIndex(0)),
-                zcash_tachyon::Anchor::default(),
-            );
+        fn first_pool_block_uses_tachyon_genesis_anchor() {
+            let block = Arc::new(stampless_block());
+            let advance = Anchor::default().advance_with_block(0, &block).unwrap();
+            let expected = Anchor::from(zcash_tachyon::Anchor::default());
+
+            assert_eq!(advance.post_block, expected);
+            assert_eq!(advance.epoch_boundary, Some(expected));
         }
 
         #[test]
@@ -357,50 +360,41 @@ mod tests {
         }
 
         /// The per-block fold matches tachyon's reference semantics for
-        /// stamp-less blocks: epoch lift on epoch-first pool heights, then a
-        /// single empty tick. Boundary lifts also surface the epoch anchor.
+        /// stamp-less blocks: the anchor changes only at epoch boundaries.
+        /// Boundary lifts also surface the epoch anchor.
         #[test]
         fn stampless_fold_matches_reference() {
             let block = Arc::new(stampless_block());
 
-            // Pool block 0: the genesis epoch lift, then one empty tick. The
-            // genesis boundary anchor is tachyon's default anchor.
-            let genesis_advance = Anchor::default().advance_with_block(0, &block);
-            let expected =
-                zcash_tachyon::Anchor::default().next_empty(zcash_tachyon::EpochIndex(0));
+            // Pool block 0 starts at tachyon's genesis anchor.
+            let genesis_advance = Anchor::default().advance_with_block(0, &block).unwrap();
+            let expected = zcash_tachyon::Anchor::default();
             assert_eq!(genesis_advance.post_block, Anchor::from(expected));
             assert_eq!(
                 genesis_advance.epoch_boundary,
                 Some(Anchor::from(zcash_tachyon::Anchor::default())),
             );
 
-            // A mid-epoch block only ticks, and crosses no boundary.
-            let next_advance = genesis_advance.post_block.advance_with_block(1, &block);
-            assert_eq!(
-                next_advance.post_block,
-                Anchor::from(expected.next_empty(zcash_tachyon::EpochIndex(0))),
-            );
+            // A stamp-less mid-epoch block leaves the anchor unchanged.
+            let next_advance = genesis_advance
+                .post_block
+                .advance_with_block(1, &block)
+                .unwrap();
+            assert_eq!(next_advance.post_block, Anchor::from(expected));
             assert_eq!(next_advance.epoch_boundary, None);
 
-            // Consecutive anchors are distinct even without stamps.
-            assert_ne!(genesis_advance.post_block, next_advance.post_block);
-
-            // An epoch-first pool height lifts into its epoch before ticking,
-            // and surfaces the boundary anchor.
+            // An epoch-first pool height lifts into its epoch and surfaces the
+            // boundary anchor.
             let boundary_advance = next_advance
                 .post_block
-                .advance_with_block(EPOCH_LENGTH, &block);
-            let expected_lift = expected
-                .next_empty(zcash_tachyon::EpochIndex(0))
-                .next_epoch(zcash_tachyon::EpochIndex(1));
+                .advance_with_block(EPOCH_LENGTH, &block)
+                .unwrap();
+            let expected_lift = expected.next_epoch(zcash_tachyon::EpochIndex(1)).unwrap();
             assert_eq!(
                 boundary_advance.epoch_boundary,
                 Some(Anchor::from(expected_lift)),
             );
-            assert_eq!(
-                boundary_advance.post_block,
-                Anchor::from(expected_lift.next_empty(zcash_tachyon::EpochIndex(1))),
-            );
+            assert_eq!(boundary_advance.post_block, Anchor::from(expected_lift));
         }
     }
 }

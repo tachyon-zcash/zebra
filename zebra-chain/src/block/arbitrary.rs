@@ -498,6 +498,7 @@ impl Block {
                 {
                     tachyon_anchor = tachyon_anchor
                         .advance_with_block(pool_height, block)
+                        .expect("generated Tachyon stamps have valid anchor transitions")
                         .post_block;
                 }
 

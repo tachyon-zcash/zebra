@@ -2040,7 +2040,7 @@ impl Chain {
         if let Some(pool_height) = zebra_chain::tachyon::pool_height(&self.network, height) {
             let advance = nct
                 .tachyon_anchor
-                .advance_with_block(pool_height, &contextually_valid.block);
+                .advance_with_block(pool_height, &contextually_valid.block)?;
             nct.tachyon_anchor = advance.post_block;
             nct.tachyon_epoch_anchor = advance.epoch_boundary;
             self.add_tachyon_anchor(height, advance.post_block);

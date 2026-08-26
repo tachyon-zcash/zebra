@@ -405,7 +405,8 @@ impl FinalizedState {
                 {
                     let advance = note_commitment_trees
                         .tachyon_anchor
-                        .advance_with_block(pool_height, &block);
+                        .advance_with_block(pool_height, &block)
+                        .map_err(ValidateContextError::from)?;
                     note_commitment_trees.tachyon_anchor = advance.post_block;
                     note_commitment_trees.tachyon_epoch_anchor = advance.epoch_boundary;
                 }
