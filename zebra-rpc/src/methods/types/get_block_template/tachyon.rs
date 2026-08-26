@@ -1,7 +1,7 @@
 //! Tachyon transaction aggregation for mined block templates.
 
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     sync::Arc,
     time::Duration,
 };
@@ -9,7 +9,7 @@ use std::{
 use rand::rngs::OsRng;
 use tokio::time::timeout;
 use tower::{BoxError, Service, ServiceExt};
-use zcash_tachyon::{AnchorSegment, Bundle, EpochIndex, PointerStamp, ProofStamp, TachyonBundle};
+use zcash_tachyon::{Bundle, EpochIndex, PointerStamp, ProofStamp, TachyonBundle};
 use zebra_chain::{
     block::{self, Block},
     parameters::Network,
@@ -298,7 +298,6 @@ fn aggregate_epoch_group(
         })
         .expect("group transactions have autonome bundles");
 
-    let mut segments = HashMap::<tachyon::Anchor, AnchorSegment>::new();
     let mut lifted_stamps = Vec::with_capacity(group.len());
 
     for &(index, start_height) in group {
@@ -309,33 +308,29 @@ fn aggregate_epoch_group(
             .iter()
             .map(|action| action.descriptor())
             .collect::<BTreeSet<_>>();
-        let mut stamp = bundle.stamp.clone();
+        let mut lifted_bundle = bundle.clone();
 
-        if start_height < target_height {
-            let start_anchor = tachyon::Anchor::from(stamp.anchor);
-            let segment = if let Some(segment) = segments.get(&start_anchor) {
-                segment.clone()
-            } else {
-                let mut steps = Vec::new();
-                for height_value in (start_height.0 + 1)..=target_height.0 {
-                    let height = block::Height(height_value);
-                    let block = blocks
-                        .get(&height)
-                        .ok_or_else(|| format!("missing block at {height:?} for Tachyon lift"))?;
-                    steps.extend(tachyon::anchor_steps(block));
-                }
+        if lifted_bundle.stamp.anchor != target_anchor {
+            let mut next_bundles = Vec::new();
+            for height_value in (start_height.0 + 1)..=target_height.0 {
+                let height = block::Height(height_value);
+                let block = blocks
+                    .get(&height)
+                    .ok_or_else(|| format!("missing block at {height:?} for Tachyon lift"))?;
+                next_bundles.extend(
+                    block
+                        .transactions
+                        .iter()
+                        .filter_map(|transaction| proof_bundle(transaction)),
+                );
+            }
 
-                let segment = AnchorSegment::prove(rng, stamp.anchor, epoch, target_anchor, &steps)
-                    .map_err(|error| format!("could not prove Tachyon anchor segment: {error}"))?;
-                segments.insert(start_anchor, segment.clone());
-                segment
-            };
-
-            stamp = ProofStamp::lift(rng, (stamp, descriptors.clone()), &segment)
+            lifted_bundle = lifted_bundle
+                .lift(rng, &[], (epoch, &next_bundles))
                 .map_err(|error| format!("could not lift Tachyon proof stamp: {error}"))?;
         }
 
-        lifted_stamps.push((stamp, descriptors));
+        lifted_stamps.push((lifted_bundle.stamp, descriptors));
     }
 
     let mut lifted_stamps = lifted_stamps.into_iter();
@@ -389,11 +384,16 @@ fn aggregate_epoch_group(
 }
 
 fn autonome_bundle(transaction: &Transaction) -> Option<&Bundle<ProofStamp>> {
+    let bundle = proof_bundle(transaction)?;
+    bundle.is_autonome().then_some(bundle)
+}
+
+fn proof_bundle(transaction: &Transaction) -> Option<&Bundle<ProofStamp>> {
     let data = transaction.tachyon_shielded_data()?;
     let TachyonBundle::Proven(bundle) = &data.0 else {
         return None;
     };
-    bundle.is_autonome().then_some(bundle)
+    Some(bundle)
 }
 
 fn replace_bundle(transaction: &mut VerifiedUnminedTx, bundle: TachyonBundle) {
@@ -411,6 +411,8 @@ fn replace_bundle(transaction: &mut VerifiedUnminedTx, bundle: TachyonBundle) {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use zcash_tachyon::{
         entropy::ActionEntropy,
         keys::private,
@@ -456,7 +458,12 @@ mod tests {
     fn older_autonome_stamp_is_lifted_before_aggregation() {
         let network = zfuture_network();
         let start_anchor = Anchor::read(&[0u8; 32][..]).expect("zero anchor reads");
-        let target_anchor = start_anchor.next_empty(EpochIndex(0));
+        let intervening_transaction = verified_transaction(start_anchor).transaction.transaction;
+        let intervening_bundle = proof_bundle(&intervening_transaction)
+            .expect("intervening transaction has a proof-stamped bundle");
+        let target_anchor = start_anchor
+            .next_stamp(EpochIndex(0), &intervening_bundle.stamp.tachygram_set)
+            .expect("intervening stamp advances the anchor");
         let original = vec![
             verified_transaction(start_anchor),
             verified_transaction(target_anchor),
@@ -469,7 +476,7 @@ mod tests {
         let mut intervening_block =
             Block::zcash_deserialize(&zebra_test::vectors::BLOCK_MAINNET_GENESIS_BYTES[..])
                 .expect("hardcoded genesis block deserializes");
-        intervening_block.transactions.clear();
+        intervening_block.transactions = vec![intervening_transaction];
         let mining_data = TachyonMiningData {
             anchor_heights: HashMap::from([
                 (tachyon::Anchor::from(start_anchor), Height(10)),
