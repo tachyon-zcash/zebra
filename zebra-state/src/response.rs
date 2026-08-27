@@ -1,7 +1,7 @@
 //! State [`tower::Service`] response types.
 
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -14,6 +14,7 @@ use zebra_chain::{
     orchard, sapling,
     serialization::DateTime32,
     subtree::{NoteCommitmentSubtreeData, NoteCommitmentSubtreeIndex},
+    tachyon,
     transaction::{self, Transaction},
     transparent,
     value_balance::ValueBalance,
@@ -33,6 +34,19 @@ use crate::{
 
 #[cfg(test)]
 mod tests;
+
+/// Best-chain data used to aggregate selected autonome Tachyon transactions.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TachyonMiningData {
+    /// Heights that created the requested anchors. Unknown anchors are omitted.
+    pub anchor_heights: HashMap<tachyon::Anchor, block::Height>,
+
+    /// Blocks needed to advance from each epoch's earliest requested anchor to its latest one.
+    pub blocks: BTreeMap<block::Height, Arc<Block>>,
+
+    /// Requested tachygrams already revealed in the candidate block's two-epoch window.
+    pub revealed_tachygrams: HashSet<tachyon::Tachygram>,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// A response to a [`StateService`](crate::service::StateService) [`Request`].
@@ -381,6 +395,10 @@ pub enum ReadResponse {
         value_balance: ValueBalance<NonNegative>,
     },
 
+    /// Response to [`ReadRequest::TachyonMiningData`], or `None` when the requested chain tip is
+    /// no longer current.
+    TachyonMiningData(Option<TachyonMiningData>),
+
     /// Response to [`ReadRequest::BlockInfo`] with
     /// the block info after the specified block.
     BlockInfo(Option<BlockInfo>),
@@ -610,6 +628,7 @@ impl TryFrom<ReadResponse> for Response {
 
             ReadResponse::UsageInfo(_)
             | ReadResponse::TipPoolValues { .. }
+            | ReadResponse::TachyonMiningData(_)
             | ReadResponse::BlockInfo(_)
             | ReadResponse::TransactionIdsForBlock(_)
             | ReadResponse::AnyChainTransactionIdsForBlock(_)

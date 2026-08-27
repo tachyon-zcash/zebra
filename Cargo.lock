@@ -7556,6 +7556,7 @@ version = "16.0.0"
 dependencies = [
  "anyhow",
  "base64",
+ "blake2b_simd",
  "bytes",
  "chrono",
  "color-eyre",
@@ -7579,6 +7580,7 @@ dependencies = [
  "phf",
  "proptest",
  "prost",
+ "ragu",
  "rand 0.8.7",
  "sapling-crypto",
  "schemars 1.2.2",
@@ -7606,6 +7608,7 @@ dependencies = [
  "zcash_proofs",
  "zcash_protocol",
  "zcash_script",
+ "zcash_tachyon",
  "zcash_transparent",
  "zebra-chain",
  "zebra-consensus",

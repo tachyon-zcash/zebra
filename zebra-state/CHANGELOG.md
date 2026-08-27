@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ### Added
 
+- `ReadRequest::TachyonMiningData` returns the anchor heights, conflicting revealed tachygrams,
+  and intervening best-chain blocks needed to aggregate selected autonome transactions for an
+  exact chain tip and candidate height.
 - The finalized and non-finalized state track the Tachyon pool (ZFuture): per-block and
   epoch-boundary anchors and revealed tachygrams, stored in the new `tachyon_anchors`,
   `tachyon_anchor_by_height`, `tachyon_epoch_anchor_by_epoch`, and

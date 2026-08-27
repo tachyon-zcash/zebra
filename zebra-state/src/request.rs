@@ -16,6 +16,7 @@ use zebra_chain::{
     parallel::tree::NoteCommitmentTrees,
     serialization::SerializationError,
     subtree::NoteCommitmentSubtreeIndex,
+    tachyon,
     transaction::{self, UnminedTx},
     transparent::{self, utxos_from_ordered_utxos},
     value_balance::{ValueBalance, ValueBalanceError},
@@ -1123,6 +1124,23 @@ pub enum ReadRequest {
     /// with the pool values of the current best chain tip.
     TipPoolValues,
 
+    /// Returns the chain data needed to aggregate transactions rooted at Tachyon anchors.
+    ///
+    /// Returns [`ReadResponse::TachyonMiningData`] if `tip_hash` is still the current best-chain
+    /// tip. Unknown anchors are omitted. For every epoch represented by a known anchor, the
+    /// response also contains the blocks between the earliest and latest requested anchors and
+    /// any requested tachygrams already revealed within the candidate's two-epoch window.
+    TachyonMiningData {
+        /// Anchors referenced by the selected autonome transactions.
+        anchors: HashSet<tachyon::Anchor>,
+        /// Tachygrams revealed by the selected autonome transactions.
+        tachygrams: HashSet<tachyon::Tachygram>,
+        /// The chain tip on which the block template is being built.
+        tip_hash: block::Hash,
+        /// The height of the candidate block being built on `tip_hash`.
+        candidate_height: block::Height,
+    },
+
     /// Looks up the block info after a block by hash or height in the current best chain.
     ///
     /// * [`ReadResponse::BlockInfo(Some(pool_values))`](ReadResponse::BlockInfo) if the block is in the best chain;
@@ -1501,6 +1519,7 @@ impl ReadRequest {
             ReadRequest::UsageInfo => "usage_info",
             ReadRequest::Tip => "tip",
             ReadRequest::TipPoolValues => "tip_pool_values",
+            ReadRequest::TachyonMiningData { .. } => "tachyon_mining_data",
             ReadRequest::BlockInfo(_) => "block_info",
             ReadRequest::Depth(_) => "depth",
             ReadRequest::Block(_) => "block",

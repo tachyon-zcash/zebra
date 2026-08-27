@@ -63,6 +63,7 @@ strum_macros = { workspace = true }
 # RPC endpoint basic auth
 base64 = { workspace = true }
 rand = { workspace = true }
+zcash_tachyon = { workspace = true }
 # Constant-time cookie comparison to prevent a timing oracle on RPC auth.
 subtle = { workspace = true }
 
@@ -126,6 +127,7 @@ tonic-prost-build = { workspace = true }
 which = { workspace = true }
 
 [dev-dependencies]
+blake2b_simd = { workspace = true }
 bytes = { workspace = true }
 http-body = { workspace = true }
 insta = { workspace = true, features = ["redactions", "json", "ron"] }
@@ -133,6 +135,7 @@ anyhow = { workspace = true }
 tempfile = { workspace = true }
 
 proptest = { workspace = true }
+ragu = { workspace = true }
 
 tokio = { workspace = true, features = ["full", "tracing", "test-util"] }
 

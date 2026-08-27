@@ -22,7 +22,7 @@ use zcash_tachyon::{
 
 use crate::{
     error::TransactionError,
-    transaction::{BlockRequest, BlockResponse, BlockTxVerifier},
+    transaction::{check, BlockRequest, BlockResponse, BlockTxVerifier},
 };
 
 /// A regtest network with ZFuture (tachyon) scheduled, and ZFuture's activation height.
@@ -76,6 +76,25 @@ fn mock_proof_stamp(tachygrams: Vec<Tachygram>) -> ProofStamp {
         anchor: zcash_tachyon::Anchor::read(&[0u8; 64][..]).expect("zero anchor reads"),
         proof: Box::new(ragu::Proof::trivial()),
     }
+}
+
+/// Computes the covered-actions digest used by a proof stamp.
+fn action_descriptor_digest(actions: &[zcash_tachyon::Action]) -> [u8; 32] {
+    let mut descriptors: Vec<[u8; 64]> = actions.iter().map(|action| action.descriptor()).collect();
+    descriptors.sort_unstable();
+
+    let mut state = blake2b_simd::Params::new()
+        .hash_length(32)
+        .personal(b"Tachyon-Actions")
+        .to_state();
+    for descriptor in descriptors {
+        state.update(&descriptor);
+    }
+    state
+        .finalize()
+        .as_bytes()
+        .try_into()
+        .expect("hash length is 32")
 }
 
 /// A random note worth `value` zatoshis, with its spending key.
@@ -173,6 +192,43 @@ async fn verify_block_transaction(
             time: Utc::now(),
         })
         .await
+}
+
+/// The mempool accepts only proof stamps that cover their own transaction's actions.
+#[test]
+fn mempool_accepts_only_autonome_tachyon_transactions() {
+    let bundle = signed_spend_bundle(100);
+    let mut stamp = mock_proof_stamp(vec![]);
+    stamp.coverage = action_descriptor_digest(&bundle.actions);
+    let autonome = bundle.stamp(stamp);
+
+    let autonome_tx = v7_transaction(
+        NetworkUpgrade::ZFuture,
+        Some(TachyonBundle::Proven(autonome.clone())),
+    );
+    assert_eq!(check::tachyon_bundle_is_autonome(&autonome_tx), Ok(()));
+
+    let mut aggregate = autonome.clone();
+    aggregate.stamp.coverage = [0xAA; 32];
+    let aggregate_tx = v7_transaction(
+        NetworkUpgrade::ZFuture,
+        Some(TachyonBundle::Proven(aggregate)),
+    );
+    assert_eq!(
+        check::tachyon_bundle_is_autonome(&aggregate_tx),
+        Err(TransactionError::NonAutonomeTachyon),
+    );
+
+    let adjunct_tx = v7_transaction(
+        NetworkUpgrade::ZFuture,
+        Some(TachyonBundle::Adjunct(autonome.strip(
+            PointerStamp::try_from([0xEE; 64]).expect("nonzero wtxid"),
+        ))),
+    );
+    assert_eq!(
+        check::tachyon_bundle_is_autonome(&adjunct_tx),
+        Err(TransactionError::NonAutonomeTachyon),
+    );
 }
 
 /// The V7 sighash commits to the tachyon bundle's effecting data, but not its stamp.

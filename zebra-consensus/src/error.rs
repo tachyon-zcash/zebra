@@ -300,6 +300,9 @@ pub enum TransactionError {
     #[error("tachyon action and binding signatures MUST verify over the transaction sighash: {0}")]
     TachyonSignatureInvalid(String),
 
+    #[error("the mempool only accepts autonome tachyon transactions")]
+    NonAutonomeTachyon,
+
     #[error("unexpected error")]
     Other(String),
 }

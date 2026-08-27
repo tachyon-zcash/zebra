@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ### Added
 
+- `tachyon::anchor_steps`, which extracts the proof-stamp or empty-block steps needed to prove an
+  intra-epoch anchor segment from committed blocks.
 - The `tachyon` module: the Tachyon pool's running anchor (`Anchor`, `AnchorAdvance`,
   `Tachygram`), epoch helpers, and `within_scan_window`, the two-epoch consensus scan
   window for tachygram duplicates and proof-stamp anchor recency

@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+### Added
+
+- `getblocktemplate` filters selected Tachyon transactions against the exact candidate tip,
+  two-epoch anchor window, and revealed-tachygram set; then it lifts and merges the remaining
+  autonome proof stamps within each anchor epoch and rewrites them as one aggregate plus
+  pointer-stamped adjuncts.
+
 ### Breaking Changes
 
 - Requires `zebra-chain` 12.0.0, whose block and transaction types appear in RPC request
